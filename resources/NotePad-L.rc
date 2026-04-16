@@ -99,6 +99,8 @@ BEGIN
         MENUITEM "&Split View\tF8",                IDM_VIEW_TOGGLE_SPLIT
         MENUITEM "Move Current Tab to Other View", IDM_VIEW_MOVE_TO_OTHER
         MENUITEM "Clone Current Tab to Other View",IDM_VIEW_CLONE_TO_OTHER
+        MENUITEM SEPARATOR
+        MENUITEM "&Dark Mode\tCtrl+Alt+D",         IDM_VIEW_DARKMODE
     END
     POPUP "&Encoding"
     BEGIN
@@ -177,6 +179,7 @@ BEGIN
     "C",       IDM_EDIT_COL_EDITOR,   VIRTKEY, ALT
     "C",       IDM_EDIT_COLUMN_MODE,  VIRTKEY, ALT, SHIFT
     "B",       IDM_EDIT_BINARY_MODE,  VIRTKEY, CONTROL, ALT
+    "D",       IDM_VIEW_DARKMODE,     VIRTKEY, CONTROL, ALT
 END
 
 // Tab right-click context menu

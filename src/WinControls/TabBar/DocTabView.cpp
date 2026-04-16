@@ -1,4 +1,5 @@
 #include "DocTabView.h"
+#include "../../Parameters/Parameters.h"
 #include <commctrl.h>
 #include <windowsx.h>
 #include <cstdlib>
@@ -196,12 +197,17 @@ BOOL DocTabView::HandleDrawItem(DRAWITEMSTRUCT* dis)
     TabCtrl_GetItem(hwnd_, idx, &it2);
 
     const bool active = (dis->itemState & ODS_SELECTED) != 0;
-    const COLORREF bg       = active ? RGB(0xFF,0xFF,0xFF) : RGB(0xEE,0xEE,0xEE);
-    const COLORREF bgHot    = RGB(0xF6,0xF6,0xF6);
-    const COLORREF fg       = active ? RGB(0x1E,0x1E,0x1E) : RGB(0x4A,0x4A,0x4A);
-    const COLORREF accent   = RGB(0x00,0x78,0xD7);   // Windows accent blue
-    const COLORREF dirtyClr = RGB(0xE5,0x1C,0x23);
-    const COLORREF border   = RGB(0xD0,0xD0,0xD0);
+    const bool isDark = Parameters::Instance().DarkMode();
+    const COLORREF bg       = isDark
+        ? (active ? RGB(0x2C,0x31,0x3A) : RGB(0x21,0x25,0x2B))
+        : (active ? RGB(0xFF,0xFF,0xFF) : RGB(0xEE,0xEE,0xEE));
+    const COLORREF bgHot    = isDark ? RGB(0x33,0x38,0x42) : RGB(0xF6,0xF6,0xF6);
+    const COLORREF fg       = isDark
+        ? (active ? RGB(0xE0,0xE0,0xE0) : RGB(0x80,0x85,0x90))
+        : (active ? RGB(0x1E,0x1E,0x1E) : RGB(0x4A,0x4A,0x4A));
+    const COLORREF accent   = isDark ? RGB(0x61,0xAF,0xEF) : RGB(0x00,0x78,0xD7);
+    const COLORREF dirtyClr = isDark ? RGB(0xE0,0x6C,0x75) : RGB(0xE5,0x1C,0x23);
+    const COLORREF border   = isDark ? RGB(0x18,0x1A,0x1F) : RGB(0xD0,0xD0,0xD0);
 
     // Background
     HBRUSH bgBrush = ::CreateSolidBrush(bg);
@@ -261,7 +267,7 @@ BOOL DocTabView::HandleDrawItem(DRAWITEMSTRUCT* dis)
 
     // Close button (X).
     RECT xr = CloseButtonRect(rc);
-    HPEN xpen = ::CreatePen(PS_SOLID, 1, RGB(0x60,0x60,0x60));
+    HPEN xpen = ::CreatePen(PS_SOLID, 1, isDark ? RGB(0x80,0x85,0x90) : RGB(0x60,0x60,0x60));
     HPEN oldp = reinterpret_cast<HPEN>(::SelectObject(hdc, xpen));
     ::MoveToEx(hdc, xr.left + 3,  xr.top + 3,    nullptr);
     ::LineTo  (hdc, xr.right - 3, xr.bottom - 3);

@@ -1,6 +1,7 @@
 #include "Notepad_plus_Window.h"
 #include "../Parameters/Parameters.h"
 #include "../Parameters/LangType.h"
+#include "../Parameters/Stylers.h"
 #include "../ScintillaComponent/BufferManager.h"
 #include "../MISC/Common/StringUtil.h"
 #include "../resource.h"
@@ -13,6 +14,7 @@
 #include <shlwapi.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <dwmapi.h>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -22,11 +24,57 @@
 #include <cstring>
 #include <cstdint>
 
+#pragma comment(lib, "dwmapi.lib")
+
 namespace npp {
 
 static constexpr wchar_t kClassName[] = L"NotePadL_MainFrame";
 
 const wchar_t* Notepad_plus_Window::ClassName() { return kClassName; }
+
+// ---- Dark mode helpers -------------------------------------------------
+
+// DWMWA_USE_IMMERSIVE_DARK_MODE (Win10 1809+, officially Win10 2004+)
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+
+static void SetTitleBarDark(HWND hwnd, bool dark)
+{
+    BOOL useDark = dark ? TRUE : FALSE;
+    ::DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
+        &useDark, sizeof(useDark));
+}
+
+static HBRUSH g_darkBgBrush = nullptr;
+
+static void ApplyDarkToFrame(HWND hwnd, HWND statusBar, HWND toolbar, bool dark)
+{
+    SetTitleBarDark(hwnd, dark);
+
+    // Status bar colors via owner-draw aren't needed — we just set the
+    // background color and let Windows render. For dark mode we set a
+    // dark background brush on the frame.
+    if (g_darkBgBrush) { ::DeleteObject(g_darkBgBrush); g_darkBgBrush = nullptr; }
+    if (dark) {
+        g_darkBgBrush = ::CreateSolidBrush(RGB(0x21,0x25,0x2B));
+    }
+
+    // Toolbar background
+    if (toolbar) {
+        ::InvalidateRect(toolbar, nullptr, TRUE);
+    }
+    // Status bar background — SB_SETBKCOLOR
+    if (statusBar) {
+        COLORREF sbBg = dark ? RGB(0x21,0x25,0x2B) : CLR_DEFAULT;
+        ::SendMessageW(statusBar, SB_SETBKCOLOR, 0, static_cast<LPARAM>(sbBg));
+        ::InvalidateRect(statusBar, nullptr, TRUE);
+    }
+
+    // Force repaint
+    ::InvalidateRect(hwnd, nullptr, TRUE);
+    ::UpdateWindow(hwnd);
+}
 
 namespace {
     constexpr int kSmartHighlightIndic = 30;
@@ -401,7 +449,7 @@ bool Notepad_plus_Window::Init(HINSTANCE hInst, int nCmdShow)
     if (!wc.hIcon) wc.hIcon = ::LoadIconW(nullptr, IDI_APPLICATION);
     wc.hIconSm       = wc.hIcon;
     wc.hCursor       = ::LoadCursorW(nullptr, IDC_ARROW);
-    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+    wc.hbrBackground = nullptr; // painted in WM_ERASEBKGND
     wc.lpszClassName = kClassName;
     if (!::RegisterClassExW(&wc)) return false;
 
@@ -515,6 +563,11 @@ void Notepad_plus_Window::OnCreate(HWND h)
     // Right-click context menu on the editor (Format JSON, etc.).
     InstallEditorCtxHook(app_.V(0).editor.Hwnd(), &app_, hwnd_);
 
+    // Apply dark mode if saved preference says so.
+    if (Parameters::Instance().DarkMode()) {
+        ApplyDarkToFrame(h, statusBar_, toolbar_, true);
+    }
+
     // If WinMain handed us files (shell association, drag-onto-exe, terminal),
     // open them instead of creating the placeholder "new 1" tab — otherwise
     // the user sees an empty scratch tab next to their file on every launch.
@@ -525,6 +578,7 @@ void Notepad_plus_Window::OnCreate(HWND h)
     if (!opened) app_.DoNew();
     RebuildRecentMenu();
     BuildLanguageMenu();
+    UpdateCheckedMenus();
     OnSize(h);
     app_.UpdateTitle(h);
     app_.UpdateStatusBar(statusBar_);
@@ -702,6 +756,9 @@ void Notepad_plus_Window::UpdateCheckedMenus()
     UINT lastLang  = IDM_LANG_BASE + static_cast<UINT>(LangType::Count_) - 1;
     UINT activeCmd = IDM_LANG_BASE + static_cast<UINT>(b->GetLang());
     ::CheckMenuRadioItem(bar, firstLang, lastLang, activeCmd, MF_BYCOMMAND);
+    // Dark mode toggle.
+    ::CheckMenuItem(bar, IDM_VIEW_DARKMODE,
+        MF_BYCOMMAND | (Parameters::Instance().DarkMode() ? MF_CHECKED : MF_UNCHECKED));
 }
 
 void Notepad_plus_Window::ShowGoToLineDialog()
@@ -814,9 +871,12 @@ struct Px { uint8_t b, g, r, a; };
 struct IconCanvas {
     int w = 16, h = 16;
     std::vector<Px> px;
-    // Pre-fill with a soft light background so icons read as flat light
-    // tiles instead of floating glyphs on the toolbar's system color.
-    IconCanvas() : px(16 * 16, Px{0xFA, 0xF7, 0xF5, 0xFF}) {}
+    IconCanvas() {
+        bool isDark = Parameters::Instance().DarkMode();
+        Px fill = isDark ? Px{0x2B, 0x25, 0x21, 0xFF}   // dark bg
+                         : Px{0xFA, 0xF7, 0xF5, 0xFF};  // light bg
+        px.assign(16 * 16, fill);
+    }
     void Dot(int x, int y, COLORREF c, uint8_t a = 255) {
         if (x < 0 || y < 0 || x >= w || y >= h) return;
         px[y * w + x] = Px{ GetBValue(c), GetGValue(c), GetRValue(c), a };
@@ -1129,6 +1189,111 @@ void Notepad_plus_Window::CreateToolbar()
     ::SendMessageW(toolbar_, TB_AUTOSIZE, 0, 0);
 }
 
+void Notepad_plus_Window::RebuildToolbar()
+{
+    if (!toolbar_) return;
+    // Destroy old image list
+    if (tbImgs_) {
+        ImageList_Destroy(reinterpret_cast<HIMAGELIST>(tbImgs_));
+        tbImgs_ = nullptr;
+    }
+    // Remove all buttons
+    while (::SendMessageW(toolbar_, TB_DELETEBUTTON, 0, 0)) {}
+    g_tbTips.clear();
+
+    // Recreate (CreateToolbar reuses toolbar_ HWND pieces we need to rebuild)
+    // We just rebuild the image list and buttons in place.
+    // Call the same logic as CreateToolbar but reuse the existing HWND.
+    ::SendMessageW(toolbar_, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16));
+
+    struct Entry { Drawer draw; int cmd; const wchar_t* tip; };
+    Entry items[] = {
+        { DrawNew,       IDM_FILE_NEW,            L"New" },
+        { DrawOpen,      IDM_FILE_OPEN,           L"Open" },
+        { DrawSave,      IDM_FILE_SAVE,           L"Save" },
+        { DrawSaveAll,   IDM_FILE_SAVEALL,        L"Save All" },
+        { DrawClose,     IDM_FILE_CLOSE,          L"Close" },
+        { DrawCloseAll,  IDM_FILE_CLOSEALL,       L"Close All" },
+        { nullptr,       0,                       nullptr },
+        { DrawCut,       IDM_EDIT_CUT,            L"Cut" },
+        { DrawCopy,      IDM_EDIT_COPY,           L"Copy" },
+        { DrawPaste,     IDM_EDIT_PASTE,          L"Paste" },
+        { DrawUndo,      IDM_EDIT_UNDO,           L"Undo" },
+        { DrawRedo,      IDM_EDIT_REDO,           L"Redo" },
+        { nullptr,       0,                       nullptr },
+        { DrawFind,      IDM_SEARCH_FIND,         L"Find" },
+        { DrawReplace,   IDM_SEARCH_REPLACE,      L"Replace" },
+        { DrawFindFiles, IDM_SEARCH_FINDFILES,    L"Find in Files" },
+        { nullptr,       0,                       nullptr },
+        { DrawBookmark,  IDM_SEARCH_BMK_TOGGLE,   L"Toggle Bookmark" },
+        { nullptr,       0,                       nullptr },
+        { DrawSplit,     IDM_VIEW_TOGGLE_SPLIT,   L"Toggle Split View" },
+        { DrawBinary,    IDM_EDIT_BINARY_MODE,    L"Binary Mode" },
+    };
+
+    HIMAGELIST il = ImageList_Create(16, 16, ILC_COLOR32, 0, 32);
+    std::vector<TBBUTTON> btns;
+    btns.reserve(ARRAYSIZE(items));
+    for (const Entry& e : items) {
+        if (!e.draw) {
+            TBBUTTON b{};
+            b.iBitmap = 0; b.idCommand = 0;
+            b.fsState = TBSTATE_ENABLED; b.fsStyle = BTNS_SEP;
+            btns.push_back(b);
+            continue;
+        }
+        IconCanvas canvas;
+        e.draw(canvas);
+        HBITMAP bmp = CanvasToBitmap(canvas);
+        int idx = ImageList_Add(il, bmp, nullptr);
+        ::DeleteObject(bmp);
+        TBBUTTON b{};
+        b.iBitmap = idx; b.idCommand = e.cmd;
+        b.fsState = TBSTATE_ENABLED; b.fsStyle = BTNS_BUTTON;
+        btns.push_back(b);
+        if (e.tip) g_tbTips[e.cmd] = e.tip;
+    }
+    ::SendMessageW(toolbar_, TB_SETIMAGELIST, 0, reinterpret_cast<LPARAM>(il));
+    tbImgs_ = il;
+    ::SendMessageW(toolbar_, TB_ADDBUTTONS,
+        static_cast<WPARAM>(btns.size()),
+        reinterpret_cast<LPARAM>(btns.data()));
+    ::SendMessageW(toolbar_, TB_AUTOSIZE, 0, 0);
+    ::InvalidateRect(toolbar_, nullptr, TRUE);
+}
+
+void Notepad_plus_Window::ToggleDarkMode()
+{
+    Parameters& p = Parameters::Instance();
+    bool newDark = !p.DarkMode();
+    p.SetDarkMode(newDark);
+    p.Save();
+
+    // Apply to title bar + frame chrome
+    ApplyDarkToFrame(hwnd_, statusBar_, toolbar_, newDark);
+
+    // Rebuild toolbar icons with new background
+    RebuildToolbar();
+
+    // Re-apply syntax styles to all open editors
+    for (int v = 0; v < 2; ++v) {
+        if (!app_.V(v).editor.Hwnd()) continue;
+        BufferID bid = app_.V(v).activeId;
+        if (bid == kInvalidBufferID) continue;
+        const Buffer* buf = BufferManager::Instance().Get(bid);
+        if (buf) ApplyLanguage(app_.V(v).editor, buf->GetLang());
+    }
+
+    // Repaint tabs
+    for (int v = 0; v < 2; ++v) {
+        if (app_.V(v).tabs.Hwnd())
+            ::InvalidateRect(app_.V(v).tabs.Hwnd(), nullptr, TRUE);
+    }
+
+    UpdateCheckedMenus();
+    OnSize(hwnd_);
+}
+
 LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
     switch (m) {
@@ -1143,6 +1308,38 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_SETFOCUS:
         app_.Editor().SetFocus();
         return 0;
+
+    case WM_ERASEBKGND: {
+        bool isDark = Parameters::Instance().DarkMode();
+        if (isDark) {
+            HDC hdc = reinterpret_cast<HDC>(w);
+            RECT rc; ::GetClientRect(h, &rc);
+            if (!g_darkBgBrush)
+                g_darkBgBrush = ::CreateSolidBrush(RGB(0x21,0x25,0x2B));
+            ::FillRect(hdc, &rc, g_darkBgBrush);
+            return 1;
+        }
+        // Fall through to default for light mode.
+        HBRUSH lightBr = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+        HDC hdc2 = reinterpret_cast<HDC>(w);
+        RECT rc2; ::GetClientRect(h, &rc2);
+        ::FillRect(hdc2, &rc2, lightBr);
+        return 1;
+    }
+
+    case WM_CTLCOLORSTATIC: {
+        // Color the status bar text in dark mode
+        HWND ctrl = reinterpret_cast<HWND>(l);
+        if (ctrl == statusBar_ && Parameters::Instance().DarkMode()) {
+            HDC hdc = reinterpret_cast<HDC>(w);
+            ::SetTextColor(hdc, RGB(0xAB,0xB2,0xBF));
+            ::SetBkColor(hdc, RGB(0x21,0x25,0x2B));
+            if (!g_darkBgBrush)
+                g_darkBgBrush = ::CreateSolidBrush(RGB(0x21,0x25,0x2B));
+            return reinterpret_cast<LRESULT>(g_darkBgBrush);
+        }
+        break;
+    }
 
     case WM_DROPFILES: {
         HDROP hdrop = reinterpret_cast<HDROP>(w);
@@ -1458,6 +1655,9 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
             WireTabContextForView(1);
             if (app_.IsSplit())
                 InstallEditorCtxHook(app_.V(1).editor.Hwnd(), &app_, hwnd_);
+            break;
+        case IDM_VIEW_DARKMODE:
+            ToggleDarkMode();
             break;
         case IDM_VIEW_MOVE_TO_OTHER:
             app_.MoveActiveTabToOtherView();

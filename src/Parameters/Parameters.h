@@ -16,6 +16,10 @@ public:
     void AddRecent(const std::wstring& path);
     void ClearRecent();
 
+    // Dark mode preference.
+    bool DarkMode() const { return darkMode_; }
+    void SetDarkMode(bool v) { darkMode_ = v; }
+
     // Load/save settings from %APPDATA%\NotePad-L\config.xml
     // M1 uses a trivial text format; replaced by TinyXML-2 in M2.
     void Load();
@@ -26,10 +30,12 @@ public:
 private:
     Parameters() = default;
     std::deque<std::wstring> recent_;
+    bool darkMode_ = false;
     // Cache of the last bytes written to recent.txt; Save() skips the write
     // when the serialized state is unchanged. Matters for bulk operations
     // like multi-file open / save-all which call Save() per item.
     mutable std::string lastSavedBlob_;
+    mutable std::string lastSavedSettings_;
 };
 
 } // namespace npp

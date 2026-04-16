@@ -45,7 +45,9 @@ private:
     void ShowColumnEditorDialog();
 
     void CreateToolbar();
+    void RebuildToolbar();
     int  ToolbarHeight() const;
+    void ToggleDarkMode();
 
     HINSTANCE      hInst_     = nullptr;
     HWND           hwnd_      = nullptr;

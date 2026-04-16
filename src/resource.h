@@ -136,5 +136,8 @@
 #define IDC_COL_BASE_BIN            2129
 #define IDC_COL_LEADZERO            2130
 
+// Settings
+#define IDM_VIEW_DARKMODE           40800
+
 // Help
 #define IDM_HELP_ABOUT              40901

@@ -4,8 +4,9 @@
 
 namespace npp {
 
-// Apply the built-in light theme + Lexilla lexer for `lang` to `view`.
+// Apply the built-in theme + Lexilla lexer for `lang` to `view`.
 // Called on buffer activation / when the user changes the language.
+// Reads Parameters::DarkMode() to choose light or dark palette.
 void ApplyLanguage(ScintillaEditView& view, LangType lang);
 
 } // namespace npp
