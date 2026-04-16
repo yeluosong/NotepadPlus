@@ -8,6 +8,10 @@ A lightweight text editor for Windows, built with Win32 + Scintilla + Lexilla.
 > Human involvement was limited to providing requirements.
 > **No manual code review has been performed on any of the source code.**
 
+## Download
+
+[NotePad-L v0.1.0 (64-bit MSI installer)](https://github.com/yeluosong/Notepad-L/releases/download/v0.1.0/NotePad-L-0.1.0-win64.msi)
+
 ## Screenshots
 
 **Syntax highlighting (C++)**
