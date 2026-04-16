@@ -63,3 +63,10 @@ M1 skeleton  ·  M2 tabs + buffer model  ·  M3 syntax + find  ·
 M4 docking + panels  ·  M5 dual view + column/multi-caret/UDL  ·
 M6 macros + compare + run  ·  M7 sessions + prefs + dark mode + FTP  ·
 M8 installer.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+Third-party components (Scintilla, Lexilla) are used under their own permissive
+licenses — see [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES) for details.
