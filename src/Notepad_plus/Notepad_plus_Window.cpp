@@ -1549,6 +1549,7 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
 
     case WM_CLOSE:
         if (!app_.CanQuit(h)) return 0;
+        app_.Shutdown();   // release Scintilla docs/windows before teardown
         ::DestroyWindow(h);
         return 0;
 

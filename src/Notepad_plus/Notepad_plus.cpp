@@ -669,6 +669,28 @@ bool Notepad_plus::CanQuit(HWND parent)
     return true;
 }
 
+void Notepad_plus::Shutdown()
+{
+    // Detach Scintilla documents from all editor views BEFORE the windows
+    // are destroyed, so Scintilla/Lexilla won't access freed lexer objects
+    // during child-window teardown (crashes on Win7).
+    for (int i = 0; i < 2; ++i) {
+        if (views_[i].editor.Hwnd())
+            views_[i].editor.Call(SCI_SETDOCPOINTER, 0, 0);
+    }
+
+    // Release all document handles held by the BufferManager.
+    auto& bm = BufferManager::Instance();
+    for (BufferID id : bm.AllIds())
+        bm.CloseBuffer(id);
+    bm.SetFactoryView(nullptr);
+
+    // Explicitly destroy Scintilla editor windows so their destructors
+    // won't try to DestroyWindow on already-dead handles later.
+    for (int i = 0; i < 2; ++i)
+        views_[i].editor.Destroy();
+}
+
 void Notepad_plus::OnEdit(unsigned int cmd)
 {
     switch (cmd) {

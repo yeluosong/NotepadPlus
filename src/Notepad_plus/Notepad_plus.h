@@ -49,6 +49,7 @@ public:
     bool     DoCloseToLeft(HWND parent, BufferID pivot);
     bool     DoCloseToRight(HWND parent, BufferID pivot);
     bool     CanQuit(HWND parent);
+    void     Shutdown();   // release all docs/editors before window destruction
 
     // Edit command forwarders.
     void OnEdit(unsigned int cmd);

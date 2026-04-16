@@ -16,9 +16,16 @@ extern "C" int Scintilla_ReleaseResources();
 
 ScintillaEditView::~ScintillaEditView()
 {
+    Destroy();
+}
+
+void ScintillaEditView::Destroy()
+{
     if (hwnd_) {
         ::DestroyWindow(hwnd_);
-        hwnd_ = nullptr;
+        hwnd_      = nullptr;
+        direct_    = nullptr;
+        directPtr_ = 0;
     }
 }
 

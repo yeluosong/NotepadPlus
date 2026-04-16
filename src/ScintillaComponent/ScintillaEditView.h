@@ -22,6 +22,7 @@ public:
     ScintillaEditView& operator=(const ScintillaEditView&) = delete;
 
     bool Create(HWND parent, HINSTANCE hInst);
+    void Destroy();   // explicit teardown; safe to call before destructor
     HWND Hwnd() const { return hwnd_; }
 
     // Resize the Scintilla child to fill 'rc'.
