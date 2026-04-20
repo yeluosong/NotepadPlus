@@ -200,25 +200,25 @@ BEGIN
     END
 END
 
-IDD_FIND_IN_FILES DIALOGEX 0, 0, 400, 196
+IDD_FIND_IN_FILES DIALOGEX 0, 0, 288, 134
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Find in Files"
-FONT 10, "Segoe UI"
+FONT 9, "Segoe UI"
 BEGIN
-    LTEXT           "Find &what:",   -1,              14,  16, 64, 10
-    EDITTEXT                         IDC_FIF_WHAT,   82,  14, 234, 16, ES_AUTOHSCROLL
-    LTEXT           "Filters:",      -1,              14,  38, 64, 10
-    EDITTEXT                         IDC_FIF_FILTERS,82,  36, 234, 16, ES_AUTOHSCROLL
-    LTEXT           "Directory:",    -1,              14,  60, 64, 10
-    EDITTEXT                         IDC_FIF_DIR,    82,  58, 212, 16, ES_AUTOHSCROLL
-    PUSHBUTTON      "...",           IDC_FIF_BROWSE,298,  58, 18, 16
-    GROUPBOX        "Options",       -1,              14, 82, 302, 66
-    AUTOCHECKBOX    "Match &case",          IDC_FIF_CASE,    24,  98, 130, 12
-    AUTOCHECKBOX    "Match &whole word",    IDC_FIF_WORD,    24, 114, 130, 12
-    AUTOCHECKBOX    "Regular e&xpression",  IDC_FIF_REGEX,  168,  98, 140, 12
-    AUTOCHECKBOX    "Include &subfolders",  IDC_FIF_SUBDIRS,168, 114, 140, 12
-    DEFPUSHBUTTON   "Find &All",     IDC_FIF_FINDALL, 260, 166, 64, 18
-    PUSHBUTTON      "Close",         IDCANCEL,        328, 166, 58, 18
+    LTEXT           "Find &what:",   -1,              10,  12, 50, 9
+    EDITTEXT                         IDC_FIF_WHAT,   62,  10, 216, 13, ES_AUTOHSCROLL
+    LTEXT           "Filters:",      -1,              10,  30, 50, 9
+    EDITTEXT                         IDC_FIF_FILTERS,62,  28, 216, 13, ES_AUTOHSCROLL
+    LTEXT           "Directory:",    -1,              10,  48, 50, 9
+    EDITTEXT                         IDC_FIF_DIR,    62,  46, 196, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "...",           IDC_FIF_BROWSE,260,  46, 18, 13
+    GROUPBOX        "Options",       -1,              10,  66, 268, 42
+    AUTOCHECKBOX    "Match &case",          IDC_FIF_CASE,    18,  78, 120, 11
+    AUTOCHECKBOX    "Match &whole word",    IDC_FIF_WORD,    18,  92, 120, 11
+    AUTOCHECKBOX    "Regular e&xpression",  IDC_FIF_REGEX,  146,  78, 124, 11
+    AUTOCHECKBOX    "Include &subfolders",  IDC_FIF_SUBDIRS,146,  92, 124, 11
+    DEFPUSHBUTTON   "Find &All",     IDC_FIF_FINDALL, 168, 114, 50, 14
+    PUSHBUTTON      "Close",         IDCANCEL,        228, 114, 50, 14
 END
 
 IDD_COL_EDITOR DIALOGEX 0, 0, 280, 238

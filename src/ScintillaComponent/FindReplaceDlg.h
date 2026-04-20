@@ -39,9 +39,7 @@ private:
         IDC_STATUS,
         IDC_QUICK_FIND,
         IDC_QUICK_REPLACE,
-        IDC_LOOKIN,
         IDC_REPLACE_LABEL,
-        IDC_LOOKIN_LABEL,
         IDC_OPTIONS_GROUP,
     };
 

@@ -126,89 +126,80 @@ void FindReplaceDlg::Show(HWND owner, HINSTANCE hInst, ScintillaEditView* view, 
     }
 
     // Vertical layout: segmented Find/Replace tab at top, Find what (+ optional
-    // Replace with) edits, Look in combo, 2-column options group, status line,
-    // right-aligned action buttons. Built in Replace layout; Find mode slides
-    // controls up 32 dlu and shrinks the dialog.
-    constexpr short kW = 300, kH = 244;
+    // Replace with) edits, 2-column options group, status line, right-aligned
+    // action buttons. Built in Replace layout; Find mode slides controls up
+    // and shrinks the dialog.
+    constexpr short kW = 224, kH = 146;
     DlgTemplateBuilder b;
     b.AddHeader(WS_POPUP | WS_CAPTION | WS_SYSMENU,
         0, 0, kW, kH,
-        L"Find and Replace", L"Segoe UI", 10);
+        L"Find and Replace", L"Segoe UI", 9);
 
     auto AddLabel = [&](short x, short y, short cx, WORD id, const wchar_t* t){
-        b.AddItem(SS_LEFT, 0, x, y, cx, 10, id, kClassStatic, t);
+        b.AddItem(SS_LEFT, 0, x, y, cx, 9, id, kClassStatic, t);
     };
     auto AddEdit = [&](short x, short y, short cx, WORD id){
         b.AddItem(WS_TABSTOP | WS_BORDER | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE,
-            x, y, cx, 16, id, kClassEdit, L"");
+            x, y, cx, 13, id, kClassEdit, L"");
     };
     auto AddCheck = [&](short x, short y, short cx, WORD id, const wchar_t* t){
         b.AddItem(BS_AUTOCHECKBOX | WS_TABSTOP, 0,
-            x, y, cx, 12, id, kClassBtn, t);
+            x, y, cx, 11, id, kClassBtn, t);
     };
     auto AddGroup = [&](short x, short y, short cx, short cy, WORD id, const wchar_t* t){
         b.AddItem(BS_GROUPBOX, 0, x, y, cx, cy, id, kClassBtn, t);
     };
     auto AddBtn = [&](short x, short y, short cx, WORD id, const wchar_t* t, bool def = false){
         DWORD st = (def ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON) | WS_TABSTOP;
-        b.AddItem(st, 0, x, y, cx, 18, id, kClassBtn, t);
+        b.AddItem(st, 0, x, y, cx, 14, id, kClassBtn, t);
     };
-    auto AddCombo = [&](short x, short y, short cx, WORD id){
-        b.AddItem(CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_TABSTOP | WS_VSCROLL,
-            0, x, y, cx, 120, id, 0x0085 /*COMBOBOX*/, L"");
-    };
-
-    constexpr short kPad = 14;
-    constexpr short kInner = kW - 2 * kPad;   // 272
+    constexpr short kPad = 8;
+    constexpr short kInner = kW - 2 * kPad;   // 208
 
     // --- Segmented Find / Replace tabs at top (pushlike radio buttons) ---
     constexpr short kTabW = (kInner) / 2;
     {
         DWORD st = BS_AUTORADIOBUTTON | BS_PUSHLIKE | WS_TABSTOP | WS_GROUP;
-        b.AddItem(st, 0, kPad,         6, kTabW, 18, IDC_QUICK_FIND,    kClassBtn, L"&Find");
+        b.AddItem(st, 0, kPad,         4, kTabW, 14, IDC_QUICK_FIND,    kClassBtn, L"&Find");
         st = BS_AUTORADIOBUTTON | BS_PUSHLIKE | WS_TABSTOP;
-        b.AddItem(st, 0, kPad + kTabW, 6, kTabW, 18, IDC_QUICK_REPLACE, kClassBtn, L"Re&place");
+        b.AddItem(st, 0, kPad + kTabW, 4, kTabW, 14, IDC_QUICK_REPLACE, kClassBtn, L"Re&place");
     }
 
     // --- Find what ---
-    AddLabel(kPad, 34, kInner, 0xFFFF, L"Find what:");
-    AddEdit (kPad, 46, kInner, IDC_FIND_WHAT);
+    AddLabel(kPad, 22, kInner, 0xFFFF, L"Find what:");
+    AddEdit (kPad, 32, kInner, IDC_FIND_WHAT);
 
     // --- Replace with (visible only in Replace mode) ---
-    AddLabel(kPad, 68, kInner, IDC_REPLACE_LABEL, L"Replace with:");
-    AddEdit (kPad, 80, kInner, IDC_REPLACE_WITH);
-
-    // --- Look in combo ---
-    AddLabel(kPad, 104, kInner, IDC_LOOKIN_LABEL, L"Look in:");
-    AddCombo(kPad, 116, kInner, IDC_LOOKIN);
+    AddLabel(kPad, 49, kInner, IDC_REPLACE_LABEL, L"Replace with:");
+    AddEdit (kPad, 59, kInner, IDC_REPLACE_WITH);
 
     // --- Find options group, 2 columns ---
-    constexpr short kOptY = 140;
-    AddGroup(kPad,            kOptY,       kInner, 58, IDC_OPTIONS_GROUP, L"Options");
-    constexpr short kCol1 = kPad + 10;
-    constexpr short kCol2 = kPad + kInner / 2 + 4;
-    constexpr short kOptW = kInner / 2 - 14;
-    AddCheck(kCol1, kOptY + 14, kOptW, IDC_CASE,      L"Match &case");
-    AddCheck(kCol1, kOptY + 28, kOptW, IDC_WHOLEWORD, L"Match &whole word");
-    AddCheck(kCol1, kOptY + 42, kOptW, IDC_REGEX,     L"Use &regular expression");
-    AddCheck(kCol2, kOptY + 14, kOptW, IDC_WRAP,      L"Wra&p around");
-    AddCheck(kCol2, kOptY + 28, kOptW, IDC_UPWARD,    L"Search &up");
+    constexpr short kOptY = 78;
+    AddGroup(kPad,            kOptY,       kInner, 42, IDC_OPTIONS_GROUP, L"Options");
+    constexpr short kCol1 = kPad + 8;
+    constexpr short kCol2 = kPad + kInner / 2 + 2;
+    constexpr short kOptW = kInner / 2 - 10;
+    AddCheck(kCol1, kOptY + 10, kOptW, IDC_CASE,      L"Match &case");
+    AddCheck(kCol1, kOptY + 20, kOptW, IDC_WHOLEWORD, L"Match &whole word");
+    AddCheck(kCol1, kOptY + 30, kOptW, IDC_REGEX,     L"Use &regular expression");
+    AddCheck(kCol2, kOptY + 10, kOptW, IDC_WRAP,      L"Wra&p around");
+    AddCheck(kCol2, kOptY + 20, kOptW, IDC_UPWARD,    L"Search &up");
 
     // --- Status line ---
-    AddLabel(kPad, kOptY + 64, kInner, IDC_STATUS, L"");
+    AddLabel(kPad, kOptY + 44, kInner, IDC_STATUS, L"");
 
     // --- Bottom action row, right-aligned ---
-    constexpr short kBtnY = kOptY + 78;
-    constexpr short kBtnW = 62;
-    constexpr short kBtnGap = 4;
+    constexpr short kBtnY = kOptY + 50;
+    constexpr short kBtnW = 50;
+    constexpr short kBtnGap = 2;
     // Right-to-left: Close, Bookmark All, Replace, Find Next (primary)
     AddBtn(kPad + kInner - kBtnW,                                                          kBtnY, kBtnW, IDC_FIND_NEXT,   L"Find &Next",  true);
     AddBtn(kPad + kInner - kBtnW * 2 - kBtnGap,                                            kBtnY, kBtnW, IDC_REPLACE_ONE, L"&Replace");
     AddBtn(kPad + kInner - kBtnW * 3 - kBtnGap * 2,                                        kBtnY, kBtnW, IDC_MARK_ALL,    L"&Mark All");
     AddBtn(kPad + kInner - kBtnW * 4 - kBtnGap * 3,                                        kBtnY, kBtnW, IDCANCEL,        L"Close");
 
-    // 4 labels + 2 edits + 5 checks + 1 groupbox + 1 combo + 6 buttons = 19
-    b.IncrementItemCount(19);
+    // 3 labels + 2 edits + 5 checks + 1 groupbox + 6 buttons = 17
+    b.IncrementItemCount(17);
 
     hwnd_ = ::CreateDialogIndirectParamW(hInst,
         reinterpret_cast<LPCDLGTEMPLATE>(b.bytes.data()),
@@ -237,9 +228,9 @@ void FindReplaceDlg::SetControlsForMode(HWND h, FindMode mode)
     ::ShowWindow(::GetDlgItem(h, IDC_REPLACE_ONE),   SW_SHOW);
 
     // Dialog template is built in Replace layout; in Find mode we slide
-    // every control below the (hidden) Replace row up by 34 dlu (label
-    // 10 + edit 16 + 8 spacing) and shrink the dialog by the same amount.
-    static constexpr int kShiftDlu = 34;
+    // every control below the (hidden) Replace row up by 27 dlu (label
+    // 9 + edit 13 + 5 spacing) and shrink the dialog by the same amount.
+    static constexpr int kShiftDlu = 27;
     RECT delta{0, 0, 0, kShiftDlu};
     ::MapDialogRect(h, &delta);
     const int shiftPx = delta.bottom;
@@ -247,7 +238,7 @@ void FindReplaceDlg::SetControlsForMode(HWND h, FindMode mode)
     if (wantShifted != shiftedUp_) {
         const int dy = wantShifted ? -shiftPx : shiftPx;
         const int ids[] = {
-            IDC_LOOKIN_LABEL, IDC_LOOKIN, IDC_OPTIONS_GROUP,
+            IDC_OPTIONS_GROUP,
             IDC_CASE, IDC_WHOLEWORD, IDC_UPWARD, IDC_WRAP, IDC_REGEX,
             IDC_STATUS, IDC_FIND_NEXT, IDC_REPLACE_ONE,
             IDC_MARK_ALL, IDCANCEL,
@@ -267,14 +258,6 @@ void FindReplaceDlg::SetControlsForMode(HWND h, FindMode mode)
             wr.right - wr.left, (wr.bottom - wr.top) + dy,
             SWP_NOMOVE | SWP_NOZORDER);
         shiftedUp_ = wantShifted;
-    }
-
-    // Seed Look-in combo with a single (decorative) option.
-    HWND combo = ::GetDlgItem(h, IDC_LOOKIN);
-    if (combo && ::SendMessageW(combo, CB_GETCOUNT, 0, 0) == 0) {
-        ::SendMessageW(combo, CB_ADDSTRING, 0,
-            reinterpret_cast<LPARAM>(L"Current Document"));
-        ::SendMessageW(combo, CB_SETCURSEL, 0, 0);
     }
 
     ::CheckDlgButton(h, IDC_QUICK_FIND,    repl ? BST_UNCHECKED : BST_CHECKED);
