@@ -11,12 +11,47 @@
 
 namespace npp {
 
+// ---- Shared UI palette ----------------------------------------------------
+namespace {
+    constexpr UiPalette kPaletteLight = {
+        /*chromeBg*/   RGB(0xEC,0xEE,0xF2),
+        /*editorBg*/   RGB(0xFA,0xFA,0xFA),
+        /*statusBg*/   RGB(0xE3,0xE5,0xE9),
+        /*border*/     RGB(0xD8,0xDA,0xDE),
+        /*text*/       RGB(0x1E,0x1E,0x1E),
+        /*textMuted*/  RGB(0x6B,0x71,0x80),
+        /*accent*/     RGB(0x2A,0x6D,0xF4),
+        /*accentDim*/  RGB(0x1D,0x5B,0xD6),
+        /*dirty*/      RGB(0xE5,0x48,0x4D),
+        /*caretLine*/  RGB(0xF0,0xF2,0xF5),
+        /*selection*/  RGB(0xAD,0xD6,0xFF),
+        /*hotBg*/      RGB(0xE0,0xE4,0xEC),
+    };
+    constexpr UiPalette kPaletteDark = {
+        /*chromeBg*/   RGB(0x1B,0x1E,0x23),
+        /*editorBg*/   RGB(0x28,0x2C,0x34),
+        /*statusBg*/   RGB(0x16,0x18,0x1C),
+        /*border*/     RGB(0x10,0x12,0x16),
+        /*text*/       RGB(0xD4,0xD8,0xE0),
+        /*textMuted*/  RGB(0x80,0x85,0x90),
+        /*accent*/     RGB(0x4A,0x9E,0xFF),
+        /*accentDim*/  RGB(0x2F,0x82,0xE8),
+        /*dirty*/      RGB(0xE0,0x6C,0x75),
+        /*caretLine*/  RGB(0x2C,0x31,0x3A),
+        /*selection*/  RGB(0x3E,0x44,0x51),
+        /*hotBg*/      RGB(0x33,0x38,0x42),
+    };
+}
+
+const UiPalette& Ui(bool dark) { return dark ? kPaletteDark : kPaletteLight; }
+const UiPalette& Ui() { return Ui(Parameters::Instance().DarkMode()); }
+
 namespace {
 
 // ---- Light theme palette ---------------------------------------------------
 namespace light {
     constexpr COLORREF kFg        = RGB(0x00,0x00,0x00);
-    constexpr COLORREF kBg        = RGB(0xFF,0xFF,0xFF);
+    constexpr COLORREF kBg        = RGB(0xFA,0xFA,0xFA);
     constexpr COLORREF kComment   = RGB(0x00,0x80,0x00);
     constexpr COLORREF kNumber    = RGB(0xFF,0x80,0x00);
     constexpr COLORREF kString    = RGB(0x80,0x80,0x80);
@@ -28,9 +63,9 @@ namespace light {
     constexpr COLORREF kIdentifier= RGB(0x00,0x00,0x00);
     constexpr COLORREF kTagName   = RGB(0x80,0x00,0x00);
     constexpr COLORREF kAttrName  = RGB(0xFF,0x00,0x00);
-    constexpr COLORREF kCaretLine = RGB(0xF0,0xF0,0xF0);
-    constexpr COLORREF kMargin    = RGB(0xF0,0xF0,0xF0);
-    constexpr COLORREF kMarginFg  = RGB(0x90,0x90,0x90);
+    constexpr COLORREF kCaretLine = RGB(0xF0,0xF2,0xF5);
+    constexpr COLORREF kMargin    = RGB(0xF2,0xF3,0xF6);
+    constexpr COLORREF kMarginFg  = RGB(0x98,0xA0,0xAE);
 }
 
 // ---- Dark theme palette (One Dark inspired) --------------------------------
@@ -49,7 +84,7 @@ namespace dark {
     constexpr COLORREF kTagName   = RGB(0xF0,0x80,0x88);
     constexpr COLORREF kAttrName  = RGB(0xD1,0x9A,0x66);
     constexpr COLORREF kCaretLine = RGB(0x2C,0x31,0x3A);
-    constexpr COLORREF kMargin    = RGB(0x21,0x25,0x2B);
+    constexpr COLORREF kMargin    = RGB(0x1E,0x21,0x27);
     constexpr COLORREF kMarginFg  = RGB(0x68,0x70,0x80);
 }
 
@@ -106,15 +141,28 @@ void ResetStyles(ScintillaEditView& v)
     v.Call(SCI_STYLESETFORE, STYLE_LINENUMBER, static_cast<sptr_t>(sMarginFg));
     v.Call(SCI_STYLESETBACK, STYLE_LINENUMBER, static_cast<sptr_t>(sMargin));
 
-    // Selection colors
+    // Caret line: subtle background + bold 2px left strip via SC_ELEMENT_CARET_LINE_BACK
+    // (Scintilla 5 supports EDGE layer, we keep legacy call for compat).
+    v.Call(SCI_SETCARETLINEFRAME, 0);
+    v.Call(SCI_SETCARETWIDTH, 2);
+
+    // Selection colors — let fg follow syntax colors (no forced override)
     bool isDark = Parameters::Instance().DarkMode();
-    if (isDark) {
-        v.Call(SCI_SETSELBACK, 1, static_cast<sptr_t>(RGB(0x3E,0x44,0x51)));
-        v.Call(SCI_SETSELFORE, 0, 0);
-    } else {
-        v.Call(SCI_SETSELBACK, 1, static_cast<sptr_t>(RGB(0xAD,0xD6,0xFF)));
-        v.Call(SCI_SETSELFORE, 0, 0);
-    }
+    const UiPalette& u = Ui(isDark);
+    v.Call(SCI_SETSELBACK, 1, static_cast<sptr_t>(u.selection));
+    v.Call(SCI_SETSELFORE, 0, 0);
+
+    // Bracket matching: use underline+bold instead of a filled background
+    COLORREF braceFg = isDark ? RGB(0xE5,0xC0,0x7B) : RGB(0x00,0x66,0xCC);
+    v.Call(SCI_STYLESETFORE, STYLE_BRACELIGHT, static_cast<sptr_t>(braceFg));
+    v.Call(SCI_STYLESETBACK, STYLE_BRACELIGHT, static_cast<sptr_t>(sBg));
+    v.Call(SCI_STYLESETBOLD, STYLE_BRACELIGHT, 1);
+    v.Call(SCI_STYLESETUNDERLINE, STYLE_BRACELIGHT, 1);
+    v.Call(SCI_STYLESETFORE, STYLE_BRACEBAD, static_cast<sptr_t>(u.dirty));
+    v.Call(SCI_STYLESETBOLD, STYLE_BRACEBAD, 1);
+
+    // Whitespace dots subdued
+    v.Call(SCI_SETWHITESPACEFORE, 1, static_cast<sptr_t>(u.textMuted));
 
     // Fold margin
     v.Call(SCI_SETFOLDMARGINCOLOUR, 1, static_cast<sptr_t>(sBg));

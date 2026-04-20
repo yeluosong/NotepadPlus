@@ -23,6 +23,18 @@ namespace npp {
 namespace {
     constexpr int kTabBarId = 5001;
     constexpr int kTabBarHeight = 30;
+
+    // Backing storage for owner-drawn status bar parts. SB_SETTEXTW with
+    // SBT_OWNERDRAW passes lParam straight through to WM_DRAWITEM as itemData,
+    // so we point it at these stable strings rather than at a stack temporary.
+    std::wstring g_sbParts[5];
+
+    void SetStatusPart(HWND sb, int idx, const wchar_t* text) {
+        g_sbParts[idx] = text ? text : L"";
+        ::SendMessageW(sb, SB_SETTEXTW,
+            static_cast<WPARAM>(idx) | SBT_OWNERDRAW,
+            reinterpret_cast<LPARAM>(g_sbParts[idx].c_str()));
+    }
 }
 
 void Notepad_plus::InitViewSlot(int idx, HWND parent, HINSTANCE hInst)
@@ -204,11 +216,11 @@ void Notepad_plus::UpdateStatusBar(HWND sb)
     wchar_t buf[128];
     ::swprintf_s(buf, L"Length: %lld    Lines: %lld",
         static_cast<long long>(len), static_cast<long long>(lines));
-    ::SendMessageW(sb, SB_SETTEXTW, 0, reinterpret_cast<LPARAM>(buf));
+    SetStatusPart(sb, 0, buf);
 
     ::swprintf_s(buf, L"Ln: %lld    Col: %lld",
         static_cast<long long>(line), static_cast<long long>(col));
-    ::SendMessageW(sb, SB_SETTEXTW, 1, reinterpret_cast<LPARAM>(buf));
+    SetStatusPart(sb, 1, buf);
 
     const wchar_t* encLabel = L"UTF-8";
     const wchar_t* eolLabel = L"CRLF";
@@ -228,12 +240,9 @@ void Notepad_plus::UpdateStatusBar(HWND sb)
     }
     std::wstring encEol = std::wstring(encLabel) + L" - "
                         + LangTypeName(b ? b->GetLang() : LangType::Text);
-    ::SendMessageW(sb, SB_SETTEXTW, 2,
-        reinterpret_cast<LPARAM>(encEol.c_str()));
-    ::SendMessageW(sb, SB_SETTEXTW, 3,
-        reinterpret_cast<LPARAM>(const_cast<wchar_t*>(eolLabel)));
-    ::SendMessageW(sb, SB_SETTEXTW, 4,
-        reinterpret_cast<LPARAM>(dirty ? L"Modified" : L"Saved"));
+    SetStatusPart(sb, 2, encEol.c_str());
+    SetStatusPart(sb, 3, eolLabel);
+    SetStatusPart(sb, 4, dirty ? L"Modified" : L"Saved");
 }
 
 void Notepad_plus::StashViewState(BufferID id)

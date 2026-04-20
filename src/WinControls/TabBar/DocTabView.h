@@ -71,6 +71,11 @@ private:
     bool dragging_     = false;
     int  dragFromIndex_= -1;
     POINT dragStart_{};
+
+    // hover state (for showing close button only over hovered tab)
+    int  hoverIndex_       = -1;
+    bool hoverOverClose_   = false;
+    bool hoverTracking_    = false;
 };
 
 } // namespace npp

@@ -38,6 +38,22 @@ const wchar_t* Notepad_plus_Window::ClassName() { return kClassName; }
 #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
+// Win11 22H2+ backdrop + rounded corners
+#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+#define DWMWA_WINDOW_CORNER_PREFERENCE 33
+#endif
+#ifndef DWMWA_SYSTEMBACKDROP_TYPE
+#define DWMWA_SYSTEMBACKDROP_TYPE 38
+#endif
+#ifndef DWMSBT_MAINWINDOW
+#define DWMSBT_MAINWINDOW 2  // Mica
+#endif
+#ifndef DWMSBT_NONE
+#define DWMSBT_NONE 1
+#endif
+#ifndef DWMWCP_ROUND
+#define DWMWCP_ROUND 2
+#endif
 
 static void SetTitleBarDark(HWND hwnd, bool dark)
 {
@@ -46,32 +62,44 @@ static void SetTitleBarDark(HWND hwnd, bool dark)
         &useDark, sizeof(useDark));
 }
 
-static HBRUSH g_darkBgBrush = nullptr;
+static void ApplyWin11Chrome(HWND hwnd)
+{
+    // Rounded corners (ignored on older Windows).
+    DWORD corner = DWMWCP_ROUND;
+    ::DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+        &corner, sizeof(corner));
+    // Mica backdrop — pulls desktop wallpaper through the frame.
+    DWORD backdrop = DWMSBT_MAINWINDOW;
+    ::DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE,
+        &backdrop, sizeof(backdrop));
+}
+
+static HBRUSH g_chromeBrush = nullptr;
+
+static HBRUSH GetChromeBrush()
+{
+    const UiPalette& u = Ui();
+    if (g_chromeBrush) { ::DeleteObject(g_chromeBrush); g_chromeBrush = nullptr; }
+    g_chromeBrush = ::CreateSolidBrush(u.chromeBg);
+    return g_chromeBrush;
+}
 
 static void ApplyDarkToFrame(HWND hwnd, HWND statusBar, HWND toolbar, bool dark)
 {
     SetTitleBarDark(hwnd, dark);
+    GetChromeBrush();  // refresh for current theme
 
-    // Status bar colors via owner-draw aren't needed — we just set the
-    // background color and let Windows render. For dark mode we set a
-    // dark background brush on the frame.
-    if (g_darkBgBrush) { ::DeleteObject(g_darkBgBrush); g_darkBgBrush = nullptr; }
-    if (dark) {
-        g_darkBgBrush = ::CreateSolidBrush(RGB(0x21,0x25,0x2B));
-    }
+    const UiPalette& u = Ui(dark);
 
-    // Toolbar background
     if (toolbar) {
         ::InvalidateRect(toolbar, nullptr, TRUE);
     }
-    // Status bar background — SB_SETBKCOLOR
     if (statusBar) {
-        COLORREF sbBg = dark ? RGB(0x21,0x25,0x2B) : CLR_DEFAULT;
-        ::SendMessageW(statusBar, SB_SETBKCOLOR, 0, static_cast<LPARAM>(sbBg));
+        ::SendMessageW(statusBar, SB_SETBKCOLOR, 0,
+            static_cast<LPARAM>(u.statusBg));
         ::InvalidateRect(statusBar, nullptr, TRUE);
     }
 
-    // Force repaint
     ::InvalidateRect(hwnd, nullptr, TRUE);
     ::UpdateWindow(hwnd);
 }
@@ -563,10 +591,10 @@ void Notepad_plus_Window::OnCreate(HWND h)
     // Right-click context menu on the editor (Format JSON, etc.).
     InstallEditorCtxHook(app_.V(0).editor.Hwnd(), &app_, hwnd_);
 
-    // Apply dark mode if saved preference says so.
-    if (Parameters::Instance().DarkMode()) {
-        ApplyDarkToFrame(h, statusBar_, toolbar_, true);
-    }
+    // Win11 rounded corners + Mica backdrop (silently ignored pre-22H2).
+    ApplyWin11Chrome(h);
+    // Apply theme (light or dark) to frame chrome.
+    ApplyDarkToFrame(h, statusBar_, toolbar_, Parameters::Instance().DarkMode());
 
     // If WinMain handed us files (shell association, drag-onto-exe, terminal),
     // open them instead of creating the placeholder "new 1" tab — otherwise
@@ -1310,33 +1338,23 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
         return 0;
 
     case WM_ERASEBKGND: {
-        bool isDark = Parameters::Instance().DarkMode();
-        if (isDark) {
-            HDC hdc = reinterpret_cast<HDC>(w);
-            RECT rc; ::GetClientRect(h, &rc);
-            if (!g_darkBgBrush)
-                g_darkBgBrush = ::CreateSolidBrush(RGB(0x21,0x25,0x2B));
-            ::FillRect(hdc, &rc, g_darkBgBrush);
-            return 1;
-        }
-        // Fall through to default for light mode.
-        HBRUSH lightBr = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
-        HDC hdc2 = reinterpret_cast<HDC>(w);
-        RECT rc2; ::GetClientRect(h, &rc2);
-        ::FillRect(hdc2, &rc2, lightBr);
+        const UiPalette& u = Ui();
+        HDC hdc = reinterpret_cast<HDC>(w);
+        RECT rc; ::GetClientRect(h, &rc);
+        if (!g_chromeBrush) g_chromeBrush = ::CreateSolidBrush(u.chromeBg);
+        ::FillRect(hdc, &rc, g_chromeBrush);
         return 1;
     }
 
     case WM_CTLCOLORSTATIC: {
-        // Color the status bar text in dark mode
         HWND ctrl = reinterpret_cast<HWND>(l);
-        if (ctrl == statusBar_ && Parameters::Instance().DarkMode()) {
+        if (ctrl == statusBar_) {
+            const UiPalette& u = Ui();
             HDC hdc = reinterpret_cast<HDC>(w);
-            ::SetTextColor(hdc, RGB(0xAB,0xB2,0xBF));
-            ::SetBkColor(hdc, RGB(0x21,0x25,0x2B));
-            if (!g_darkBgBrush)
-                g_darkBgBrush = ::CreateSolidBrush(RGB(0x21,0x25,0x2B));
-            return reinterpret_cast<LRESULT>(g_darkBgBrush);
+            ::SetTextColor(hdc, u.text);
+            ::SetBkColor(hdc, u.statusBg);
+            if (!g_chromeBrush) g_chromeBrush = ::CreateSolidBrush(u.chromeBg);
+            return reinterpret_cast<LRESULT>(g_chromeBrush);
         }
         break;
     }
@@ -1386,6 +1404,22 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
         if (dis && (dis->CtlID == 5001 || dis->CtlID == 5002)) {
             int v = (dis->CtlID == 5001) ? 0 : 1;
             app_.V(v).tabs.HandleDrawItem(dis);
+            return TRUE;
+        }
+        if (dis && dis->hwndItem == statusBar_) {
+            const UiPalette& u = Ui();
+            HBRUSH bg = ::CreateSolidBrush(u.statusBg);
+            ::FillRect(dis->hDC, &dis->rcItem, bg);
+            ::DeleteObject(bg);
+            const wchar_t* text = reinterpret_cast<const wchar_t*>(dis->itemData);
+            if (text && *text) {
+                ::SetBkMode(dis->hDC, TRANSPARENT);
+                ::SetTextColor(dis->hDC, u.text);
+                RECT tr = dis->rcItem;
+                tr.left += 6;
+                ::DrawTextW(dis->hDC, text, -1, &tr,
+                    DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOPREFIX | DT_END_ELLIPSIS);
+            }
             return TRUE;
         }
         break;

@@ -1,5 +1,6 @@
 #include "DocTabView.h"
 #include "../../Parameters/Parameters.h"
+#include "../../Parameters/Stylers.h"
 #include <commctrl.h>
 #include <windowsx.h>
 #include <cstdlib>
@@ -26,7 +27,7 @@ bool DocTabView::Create(HWND parent, HINSTANCE hInst, int ctrlId)
 
     // Modern UI font.
     LOGFONTW lf{};
-    lf.lfHeight = -12;
+    lf.lfHeight = -13;
     lf.lfWeight = FW_NORMAL;
     lf.lfCharSet = DEFAULT_CHARSET;
     lf.lfQuality = CLEARTYPE_QUALITY;
@@ -36,8 +37,8 @@ bool DocTabView::Create(HWND parent, HINSTANCE hInst, int ctrlId)
     ::SendMessageW(hwnd_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
 
     // Fixed-size item height — owner-draw computes width itself.
-    TabCtrl_SetItemSize(hwnd_, 160, 26);
-    TabCtrl_SetPadding(hwnd_, 12, 3);
+    TabCtrl_SetItemSize(hwnd_, 180, 30);
+    TabCtrl_SetPadding(hwnd_, 14, 4);
 
     ::SetWindowSubclass(hwnd_, &DocTabView::TabSubclass,
         kSubclassId, reinterpret_cast<DWORD_PTR>(this));
@@ -197,66 +198,66 @@ BOOL DocTabView::HandleDrawItem(DRAWITEMSTRUCT* dis)
     TabCtrl_GetItem(hwnd_, idx, &it2);
 
     const bool active = (dis->itemState & ODS_SELECTED) != 0;
+    const bool hover  = (idx == hoverIndex_);
     const bool isDark = Parameters::Instance().DarkMode();
-    const COLORREF bg       = isDark
-        ? (active ? RGB(0x2C,0x31,0x3A) : RGB(0x21,0x25,0x2B))
-        : (active ? RGB(0xFF,0xFF,0xFF) : RGB(0xEE,0xEE,0xEE));
-    const COLORREF bgHot    = isDark ? RGB(0x33,0x38,0x42) : RGB(0xF6,0xF6,0xF6);
-    const COLORREF fg       = isDark
-        ? (active ? RGB(0xE0,0xE0,0xE0) : RGB(0x80,0x85,0x90))
-        : (active ? RGB(0x1E,0x1E,0x1E) : RGB(0x4A,0x4A,0x4A));
-    const COLORREF accent   = isDark ? RGB(0x61,0xAF,0xEF) : RGB(0x00,0x78,0xD7);
-    const COLORREF dirtyClr = isDark ? RGB(0xE0,0x6C,0x75) : RGB(0xE5,0x1C,0x23);
-    const COLORREF border   = isDark ? RGB(0x18,0x1A,0x1F) : RGB(0xD0,0xD0,0xD0);
+    const UiPalette& u = Ui(isDark);
+    // Active tab = editor bg (so it visually connects to editor below).
+    // Inactive = chrome bg. Hovered inactive gets a subtle lift.
+    const COLORREF bg = active ? u.editorBg
+                               : (hover ? u.hotBg : u.chromeBg);
+    const COLORREF fg = active ? u.text : u.textMuted;
 
     // Background
     HBRUSH bgBrush = ::CreateSolidBrush(bg);
     ::FillRect(hdc, &rc, bgBrush);
     ::DeleteObject(bgBrush);
 
-    // Top accent strip on active tab.
+    // Top accent strip on active tab (2px, flush).
     if (active) {
-        RECT strip = rc; strip.bottom = strip.top + 3;
-        HBRUSH ab = ::CreateSolidBrush(accent);
+        RECT strip = rc; strip.bottom = strip.top + 2;
+        HBRUSH ab = ::CreateSolidBrush(u.accent);
         ::FillRect(hdc, &strip, ab);
         ::DeleteObject(ab);
     }
 
-    // Bottom separator line on inactive tabs.
+    // Bottom separator on inactive tabs — hides on active so it joins editor.
     if (!active) {
-        HPEN pen = ::CreatePen(PS_SOLID, 1, border);
+        HPEN pen = ::CreatePen(PS_SOLID, 1, u.border);
         HPEN old = reinterpret_cast<HPEN>(::SelectObject(hdc, pen));
         ::MoveToEx(hdc, rc.left, rc.bottom - 1, nullptr);
         ::LineTo  (hdc, rc.right, rc.bottom - 1);
         ::SelectObject(hdc, old);
         ::DeleteObject(pen);
     }
-    // Right-side vertical divider between tabs.
-    {
-        HPEN pen = ::CreatePen(PS_SOLID, 1, border);
+    // Subtle vertical divider between inactive tabs (not flanking active).
+    if (!active) {
+        HPEN pen = ::CreatePen(PS_SOLID, 1, u.border);
         HPEN old = reinterpret_cast<HPEN>(::SelectObject(hdc, pen));
-        ::MoveToEx(hdc, rc.right - 1, rc.top + 4, nullptr);
-        ::LineTo  (hdc, rc.right - 1, rc.bottom - 4);
+        ::MoveToEx(hdc, rc.right - 1, rc.top + 6, nullptr);
+        ::LineTo  (hdc, rc.right - 1, rc.bottom - 6);
         ::SelectObject(hdc, old);
         ::DeleteObject(pen);
     }
-    (void)bgHot;
 
     // Text + optional dirty red dot.
     ::SetBkMode(hdc, TRANSPARENT);
     ::SetTextColor(hdc, fg);
 
     RECT textRc = rc;
-    textRc.left  += 10;
-    textRc.right -= kCloseBtnSize + 10;
+    textRc.left  += 12;
+    textRc.right -= kCloseBtnSize + 12;
 
+    const bool showClose = active || hover;
+    if (!showClose) textRc.right += kCloseBtnSize + 4;  // reclaim space
+
+    // Dirty dot uses accent color when active, dirty color otherwise.
     if (data && data->dirty) {
         RECT dot;
         dot.left   = textRc.left;
-        dot.top    = rc.top + (rc.bottom - rc.top) / 2 - 4;
-        dot.right  = dot.left + 8;
-        dot.bottom = dot.top + 8;
-        HBRUSH db = ::CreateSolidBrush(dirtyClr);
+        dot.top    = rc.top + (rc.bottom - rc.top) / 2 - 3;
+        dot.right  = dot.left + 7;
+        dot.bottom = dot.top + 7;
+        HBRUSH db = ::CreateSolidBrush(u.dirty);
         ::FillRect(hdc, &dot, db);
         ::DeleteObject(db);
         textRc.left += 12;
@@ -265,16 +266,25 @@ BOOL DocTabView::HandleDrawItem(DRAWITEMSTRUCT* dis)
     ::DrawTextW(hdc, textBuf, -1, &textRc,
         DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 
-    // Close button (X).
-    RECT xr = CloseButtonRect(rc);
-    HPEN xpen = ::CreatePen(PS_SOLID, 1, isDark ? RGB(0x80,0x85,0x90) : RGB(0x60,0x60,0x60));
-    HPEN oldp = reinterpret_cast<HPEN>(::SelectObject(hdc, xpen));
-    ::MoveToEx(hdc, xr.left + 3,  xr.top + 3,    nullptr);
-    ::LineTo  (hdc, xr.right - 3, xr.bottom - 3);
-    ::MoveToEx(hdc, xr.right - 3, xr.top + 3,    nullptr);
-    ::LineTo  (hdc, xr.left + 3,  xr.bottom - 3);
-    ::SelectObject(hdc, oldp);
-    ::DeleteObject(xpen);
+    // Close button (X) — only shown on active or hovered tabs.
+    if (showClose) {
+        RECT xr = CloseButtonRect(rc);
+        const bool closeHot = hover && hoverOverClose_;
+        if (closeHot) {
+            HBRUSH hb = ::CreateSolidBrush(u.dirty);
+            ::FillRect(hdc, &xr, hb);
+            ::DeleteObject(hb);
+        }
+        COLORREF xColor = closeHot ? RGB(0xFF,0xFF,0xFF) : u.textMuted;
+        HPEN xpen = ::CreatePen(PS_SOLID, 1, xColor);
+        HPEN oldp = reinterpret_cast<HPEN>(::SelectObject(hdc, xpen));
+        ::MoveToEx(hdc, xr.left + 4,  xr.top + 4,    nullptr);
+        ::LineTo  (hdc, xr.right - 3, xr.bottom - 3);
+        ::MoveToEx(hdc, xr.right - 4, xr.top + 4,    nullptr);
+        ::LineTo  (hdc, xr.left + 3,  xr.bottom - 3);
+        ::SelectObject(hdc, oldp);
+        ::DeleteObject(xpen);
+    }
 
     return TRUE;
 }
@@ -372,7 +382,30 @@ LRESULT DocTabView::TabProc(HWND h, UINT m, WPARAM w, LPARAM l)
         }
         break;
     }
+    case WM_MOUSELEAVE: {
+        if (hoverIndex_ != -1 || hoverOverClose_) {
+            hoverIndex_ = -1;
+            hoverOverClose_ = false;
+            ::InvalidateRect(h, nullptr, TRUE);
+        }
+        hoverTracking_ = false;
+        break;
+    }
     case WM_MOUSEMOVE: {
+        // Track hover for close-button reveal.
+        POINT mpt{ GET_X_LPARAM(l), GET_Y_LPARAM(l) };
+        bool overClose = false;
+        int  idx = HitTest(mpt, &overClose);
+        if (!hoverTracking_) {
+            TRACKMOUSEEVENT tme{ sizeof(tme), TME_LEAVE, h, 0 };
+            ::TrackMouseEvent(&tme);
+            hoverTracking_ = true;
+        }
+        if (idx != hoverIndex_ || overClose != hoverOverClose_) {
+            hoverIndex_ = idx;
+            hoverOverClose_ = overClose;
+            ::InvalidateRect(h, nullptr, TRUE);
+        }
         if (dragging_) {
             if ((::GetKeyState(VK_LBUTTON) & 0x8000) == 0) {
                 dragging_ = false;

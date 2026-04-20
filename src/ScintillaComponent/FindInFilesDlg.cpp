@@ -1,9 +1,34 @@
 #include "FindInFilesDlg.h"
 #include "../resource.h"
+#include "../Parameters/Parameters.h"
+#include "../Parameters/Stylers.h"
 #include <commctrl.h>
 #include <shlobj.h>
+#include <dwmapi.h>
+
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
 
 namespace npp {
+
+namespace {
+INT_PTR HandleThemedCtlColor(UINT m, WPARAM w, LPARAM l)
+{
+    if (!Parameters::Instance().DarkMode()) return 0;
+    const UiPalette& u = Ui(true);
+    HDC hdc = reinterpret_cast<HDC>(w);
+    ::SetTextColor(hdc, u.text);
+    bool isEdit = (m == WM_CTLCOLOREDIT || m == WM_CTLCOLORLISTBOX);
+    COLORREF bg = isEdit ? u.editorBg : u.chromeBg;
+    ::SetBkColor(hdc, bg);
+    static HBRUSH brChrome = nullptr, brEditor = nullptr;
+    if (!brChrome) brChrome = ::CreateSolidBrush(u.chromeBg);
+    if (!brEditor) brEditor = ::CreateSolidBrush(u.editorBg);
+    (void)l;
+    return reinterpret_cast<INT_PTR>(isEdit ? brEditor : brChrome);
+}
+}
 
 namespace {
 
@@ -33,6 +58,9 @@ INT_PTR CALLBACK DlgProc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_INITDIALOG: {
         s = reinterpret_cast<State*>(l);
         ::SetWindowLongPtrW(h, GWLP_USERDATA, l);
+        BOOL dark = Parameters::Instance().DarkMode() ? TRUE : FALSE;
+        ::DwmSetWindowAttribute(h, DWMWA_USE_IMMERSIVE_DARK_MODE,
+            &dark, sizeof(dark));
         ::SetDlgItemTextW(h, IDC_FIF_DIR, s->in.dir.c_str());
         ::SetDlgItemTextW(h, IDC_FIF_FILTERS, s->in.filters.c_str());
         ::SetDlgItemTextW(h, IDC_FIF_WHAT, s->in.what.c_str());
@@ -93,6 +121,16 @@ INT_PTR CALLBACK DlgProc(HWND h, UINT m, WPARAM w, LPARAM l)
         break;
     }
     case WM_CLOSE: ::EndDialog(h, IDCANCEL); return TRUE;
+
+    case WM_CTLCOLORDLG:
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLORBTN:
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX: {
+        INT_PTR r = HandleThemedCtlColor(m, w, l);
+        if (r) { ::SetWindowLongPtrW(h, DWLP_MSGRESULT, r); return TRUE; }
+        break;
+    }
     }
     return FALSE;
 }

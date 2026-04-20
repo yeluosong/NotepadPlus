@@ -1,14 +1,21 @@
 #include "FindReplaceDlg.h"
 #include "ScintillaEditView.h"
 #include "../MISC/Common/StringUtil.h"
+#include "../Parameters/Parameters.h"
+#include "../Parameters/Stylers.h"
 
 #include <Scintilla.h>
 #include <ScintillaMessages.h>
 
 #include <commctrl.h>
 #include <windowsx.h>
+#include <dwmapi.h>
 #include <string>
 #include <vector>
+
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
 
 namespace npp {
 
@@ -118,78 +125,87 @@ void FindReplaceDlg::Show(HWND owner, HINSTANCE hInst, ScintillaEditView* view, 
         return;
     }
 
-    // Vertical, sectioned layout modeled after the Visual-Studio
-    // "Find and Replace" tool window: two mode-toggle buttons at top,
-    // a single Find what / (optional) Replace with column, a "Look in"
-    // combo, a grouped "Find options" panel, then a row of action
-    // buttons at the bottom.
-    // Built with the Replace-mode (taller) layout. In Find mode the
-    // Replace row is hidden and the controls below it slide up.
-    constexpr short kW = 244, kH = 218;
+    // Vertical layout: segmented Find/Replace tab at top, Find what (+ optional
+    // Replace with) edits, Look in combo, 2-column options group, status line,
+    // right-aligned action buttons. Built in Replace layout; Find mode slides
+    // controls up 32 dlu and shrinks the dialog.
+    constexpr short kW = 300, kH = 244;
     DlgTemplateBuilder b;
     b.AddHeader(WS_POPUP | WS_CAPTION | WS_SYSMENU,
         0, 0, kW, kH,
-        L"Find and Replace", L"Segoe UI", 9);
+        L"Find and Replace", L"Segoe UI", 10);
 
     auto AddLabel = [&](short x, short y, short cx, WORD id, const wchar_t* t){
-        b.AddItem(SS_LEFT, 0, x, y, cx, 9, id, kClassStatic, t);
+        b.AddItem(SS_LEFT, 0, x, y, cx, 10, id, kClassStatic, t);
     };
     auto AddEdit = [&](short x, short y, short cx, WORD id){
         b.AddItem(WS_TABSTOP | WS_BORDER | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE,
-            x, y, cx, 14, id, kClassEdit, L"");
+            x, y, cx, 16, id, kClassEdit, L"");
     };
     auto AddCheck = [&](short x, short y, short cx, WORD id, const wchar_t* t){
         b.AddItem(BS_AUTOCHECKBOX | WS_TABSTOP, 0,
-            x, y, cx, 10, id, kClassBtn, t);
+            x, y, cx, 12, id, kClassBtn, t);
     };
     auto AddGroup = [&](short x, short y, short cx, short cy, WORD id, const wchar_t* t){
         b.AddItem(BS_GROUPBOX, 0, x, y, cx, cy, id, kClassBtn, t);
     };
     auto AddBtn = [&](short x, short y, short cx, WORD id, const wchar_t* t, bool def = false){
         DWORD st = (def ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON) | WS_TABSTOP;
-        b.AddItem(st, 0, x, y, cx, 16, id, kClassBtn, t);
+        b.AddItem(st, 0, x, y, cx, 18, id, kClassBtn, t);
     };
     auto AddCombo = [&](short x, short y, short cx, WORD id){
         b.AddItem(CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_TABSTOP | WS_VSCROLL,
-            0, x, y, cx, 90, id, 0x0085 /*COMBOBOX*/, L"");
+            0, x, y, cx, 120, id, 0x0085 /*COMBOBOX*/, L"");
     };
 
-    constexpr short kPad = 10;
-    constexpr short kInner = kW - 2 * kPad;   // 224
+    constexpr short kPad = 14;
+    constexpr short kInner = kW - 2 * kPad;   // 272
 
-    // --- Mode-toggle row at top ---
-    AddBtn(kPad,         4, 100, IDC_QUICK_FIND,    L"Quick &Find",    true);
-    AddBtn(kPad + 108,   4, 100, IDC_QUICK_REPLACE, L"Quick Re&place");
+    // --- Segmented Find / Replace tabs at top (pushlike radio buttons) ---
+    constexpr short kTabW = (kInner) / 2;
+    {
+        DWORD st = BS_AUTORADIOBUTTON | BS_PUSHLIKE | WS_TABSTOP | WS_GROUP;
+        b.AddItem(st, 0, kPad,         6, kTabW, 18, IDC_QUICK_FIND,    kClassBtn, L"&Find");
+        st = BS_AUTORADIOBUTTON | BS_PUSHLIKE | WS_TABSTOP;
+        b.AddItem(st, 0, kPad + kTabW, 6, kTabW, 18, IDC_QUICK_REPLACE, kClassBtn, L"Re&place");
+    }
 
     // --- Find what ---
-    AddLabel(kPad, 26, kInner, 0xFFFF, L"Find what:");
-    AddEdit (kPad, 36, kInner, IDC_FIND_WHAT);
+    AddLabel(kPad, 34, kInner, 0xFFFF, L"Find what:");
+    AddEdit (kPad, 46, kInner, IDC_FIND_WHAT);
 
     // --- Replace with (visible only in Replace mode) ---
-    AddLabel(kPad, 54, kInner, IDC_REPLACE_LABEL, L"Replace with:");
-    AddEdit (kPad, 64, kInner, IDC_REPLACE_WITH);
+    AddLabel(kPad, 68, kInner, IDC_REPLACE_LABEL, L"Replace with:");
+    AddEdit (kPad, 80, kInner, IDC_REPLACE_WITH);
 
     // --- Look in combo ---
-    AddLabel(kPad, 84, kInner, IDC_LOOKIN_LABEL, L"Look in:");
-    AddCombo(kPad, 94, kInner, IDC_LOOKIN);
+    AddLabel(kPad, 104, kInner, IDC_LOOKIN_LABEL, L"Look in:");
+    AddCombo(kPad, 116, kInner, IDC_LOOKIN);
 
-    // --- Find options group (tight 12-dlu line spacing) ---
-    AddGroup(kPad,     114, kInner, 76, IDC_OPTIONS_GROUP, L"Find options");
-    AddCheck(kPad + 8, 126, kInner - 16, IDC_CASE,      L"Match &case");
-    AddCheck(kPad + 8, 138, kInner - 16, IDC_WHOLEWORD, L"Match &whole word");
-    AddCheck(kPad + 8, 150, kInner - 16, IDC_UPWARD,    L"Search &up");
-    AddCheck(kPad + 8, 162, kInner - 16, IDC_WRAP,      L"Wra&p around");
-    AddCheck(kPad + 8, 174, kInner - 16, IDC_REGEX,     L"Use regular e&xpression");
+    // --- Find options group, 2 columns ---
+    constexpr short kOptY = 140;
+    AddGroup(kPad,            kOptY,       kInner, 58, IDC_OPTIONS_GROUP, L"Options");
+    constexpr short kCol1 = kPad + 10;
+    constexpr short kCol2 = kPad + kInner / 2 + 4;
+    constexpr short kOptW = kInner / 2 - 14;
+    AddCheck(kCol1, kOptY + 14, kOptW, IDC_CASE,      L"Match &case");
+    AddCheck(kCol1, kOptY + 28, kOptW, IDC_WHOLEWORD, L"Match &whole word");
+    AddCheck(kCol1, kOptY + 42, kOptW, IDC_REGEX,     L"Use &regular expression");
+    AddCheck(kCol2, kOptY + 14, kOptW, IDC_WRAP,      L"Wra&p around");
+    AddCheck(kCol2, kOptY + 28, kOptW, IDC_UPWARD,    L"Search &up");
 
-    // --- Status line (sits in the 4-dlu margin between group and buttons) ---
-    AddLabel(kPad, 194, kInner, IDC_STATUS, L"");
+    // --- Status line ---
+    AddLabel(kPad, kOptY + 64, kInner, IDC_STATUS, L"");
 
-    // --- Bottom action row ---
-    constexpr short kBtnY = 200;
-    AddBtn(kPad,         kBtnY, 56, IDC_FIND_NEXT,   L"Find &Next", true);
-    AddBtn(kPad + 60,    kBtnY, 56, IDC_REPLACE_ONE, L"&Replace");
-    AddBtn(kPad + 120,   kBtnY, 56, IDC_MARK_ALL,    L"&Bookmark All");
-    AddBtn(kPad + 180,   kBtnY, 44, IDCANCEL,        L"Close");
+    // --- Bottom action row, right-aligned ---
+    constexpr short kBtnY = kOptY + 78;
+    constexpr short kBtnW = 62;
+    constexpr short kBtnGap = 4;
+    // Right-to-left: Close, Bookmark All, Replace, Find Next (primary)
+    AddBtn(kPad + kInner - kBtnW,                                                          kBtnY, kBtnW, IDC_FIND_NEXT,   L"Find &Next",  true);
+    AddBtn(kPad + kInner - kBtnW * 2 - kBtnGap,                                            kBtnY, kBtnW, IDC_REPLACE_ONE, L"&Replace");
+    AddBtn(kPad + kInner - kBtnW * 3 - kBtnGap * 2,                                        kBtnY, kBtnW, IDC_MARK_ALL,    L"&Mark All");
+    AddBtn(kPad + kInner - kBtnW * 4 - kBtnGap * 3,                                        kBtnY, kBtnW, IDCANCEL,        L"Close");
 
     // 4 labels + 2 edits + 5 checks + 1 groupbox + 1 combo + 6 buttons = 19
     b.IncrementItemCount(19);
@@ -221,9 +237,9 @@ void FindReplaceDlg::SetControlsForMode(HWND h, FindMode mode)
     ::ShowWindow(::GetDlgItem(h, IDC_REPLACE_ONE),   SW_SHOW);
 
     // Dialog template is built in Replace layout; in Find mode we slide
-    // every control below the (hidden) Replace row up by 30 dlu (label
-    // 9 + edit 14 + 7 spacing) and shrink the dialog by the same amount.
-    static constexpr int kShiftDlu = 30;
+    // every control below the (hidden) Replace row up by 34 dlu (label
+    // 10 + edit 16 + 8 spacing) and shrink the dialog by the same amount.
+    static constexpr int kShiftDlu = 34;
     RECT delta{0, 0, 0, kShiftDlu};
     ::MapDialogRect(h, &delta);
     const int shiftPx = delta.bottom;
@@ -261,6 +277,8 @@ void FindReplaceDlg::SetControlsForMode(HWND h, FindMode mode)
         ::SendMessageW(combo, CB_SETCURSEL, 0, 0);
     }
 
+    ::CheckDlgButton(h, IDC_QUICK_FIND,    repl ? BST_UNCHECKED : BST_CHECKED);
+    ::CheckDlgButton(h, IDC_QUICK_REPLACE, repl ? BST_CHECKED   : BST_UNCHECKED);
     ::CheckDlgButton(h, IDC_CASE,      optCase_  ? BST_CHECKED : BST_UNCHECKED);
     ::CheckDlgButton(h, IDC_WHOLEWORD, optWhole_ ? BST_CHECKED : BST_UNCHECKED);
     ::CheckDlgButton(h, IDC_REGEX,     optRegex_ ? BST_CHECKED : BST_UNCHECKED);
@@ -441,6 +459,10 @@ INT_PTR FindReplaceDlg::HandleMessage(HWND h, UINT m, WPARAM w, LPARAM l)
 {
     switch (m) {
     case WM_INITDIALOG: {
+        // Title bar follows theme on Win11.
+        BOOL dark = Parameters::Instance().DarkMode() ? TRUE : FALSE;
+        ::DwmSetWindowAttribute(h, DWMWA_USE_IMMERSIVE_DARK_MODE,
+            &dark, sizeof(dark));
         if (!lastFind_.empty()) {
             ::SetDlgItemTextW(h, IDC_FIND_WHAT, Utf8ToWide(lastFind_).c_str());
         }
@@ -448,6 +470,36 @@ INT_PTR FindReplaceDlg::HandleMessage(HWND h, UINT m, WPARAM w, LPARAM l)
             ::SetDlgItemTextW(h, IDC_REPLACE_WITH, Utf8ToWide(lastReplace_).c_str());
         }
         return TRUE;
+    }
+
+    case WM_CTLCOLORDLG:
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLORBTN:
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX: {
+        if (!Parameters::Instance().DarkMode()) break;
+        const UiPalette& u = Ui(true);
+        HDC hdc = reinterpret_cast<HDC>(w);
+        HWND ctrl = reinterpret_cast<HWND>(l);
+        WORD cid = static_cast<WORD>(::GetDlgCtrlID(ctrl));
+        ::SetTextColor(hdc,
+            cid == IDC_STATUS ? u.textMuted : u.text);
+        // Edit + combo use editor bg to stand out; others use chrome bg.
+        COLORREF bg = (m == WM_CTLCOLOREDIT || m == WM_CTLCOLORLISTBOX)
+            ? u.editorBg : u.chromeBg;
+        ::SetBkColor(hdc, bg);
+        static HBRUSH brChrome = nullptr;
+        static HBRUSH brEditor = nullptr;
+        static bool   brDark   = false;
+        if (!brDark) {
+            if (brChrome) ::DeleteObject(brChrome);
+            if (brEditor) ::DeleteObject(brEditor);
+            brChrome = ::CreateSolidBrush(u.chromeBg);
+            brEditor = ::CreateSolidBrush(u.editorBg);
+            brDark = true;
+        }
+        return reinterpret_cast<INT_PTR>(
+            (m == WM_CTLCOLOREDIT || m == WM_CTLCOLORLISTBOX) ? brEditor : brChrome);
     }
     case WM_COMMAND: {
         const WORD id = LOWORD(w);
