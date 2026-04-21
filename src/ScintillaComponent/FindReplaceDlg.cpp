@@ -461,7 +461,7 @@ INT_PTR FindReplaceDlg::HandleMessage(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORLISTBOX: {
         if (!Parameters::Instance().DarkMode()) break;
-        const UiPalette& u = Ui(true);
+        const UiPalette& u = Ui();
         HDC hdc = reinterpret_cast<HDC>(w);
         HWND ctrl = reinterpret_cast<HWND>(l);
         WORD cid = static_cast<WORD>(::GetDlgCtrlID(ctrl));

@@ -9,7 +9,6 @@
 #include "../WinControls/Docking/FunctionListPanel.h"
 #include "../WinControls/Docking/DocMapPanel.h"
 #include "../WinControls/Docking/FolderWorkspacePanel.h"
-#include "../Diff/CompareController.h"
 #include <windows.h>
 #include <string>
 #include <unordered_map>
@@ -87,11 +86,6 @@ public:
     const ViewSlot& V(int i)const{ return views_[i]; }
     int             ActiveView() const { return activeView_; }
     void            SetActiveView(int v);
-    bool            IsSplit() const    { return splitEnabled_; }
-    void            ToggleSplit(HWND parent, HINSTANCE hInst);
-    void            MoveActiveTabToOtherView();
-    void            CloneActiveTabToOtherView();
-    void            SetSplitRatioFromX(int x, int totalW);  // splitter drag
 
     // Public getters proxy to the active view so existing call sites stay valid.
     ScintillaEditView& Editor() { return V().editor; }
@@ -128,9 +122,7 @@ private:
 
     ViewSlot          views_[2];
     int               activeView_   = 0;
-    bool              splitEnabled_ = false;
-    HWND              splitter_     = nullptr;
-    int               splitRatio_   = 50;  // percent width of view 0
+    static constexpr bool splitEnabled_ = false;  // dual-view feature removed; kept for branch gating
 
     FindReplaceDlg    findDlg_;
     DockingManager    dock_;
@@ -139,15 +131,10 @@ private:
     DocMapPanel       docMap_;
     FolderWorkspacePanel folder_;
     FindInFilesParams lastFif_{};
-    CompareController compare_;
     std::unordered_map<BufferID, std::string> binarySnapshot_;
     bool              binaryMutating_ = false;
 
 public:
-    CompareController& Compare() { return compare_; }
-    // Toggle compare between view 0 and view 1; requires split.
-    void ToggleCompare();
-
     // Binary (hex-dump) view toggle for the active buffer.
     // ON: snapshots current bytes, replaces editor with `xxd`-style hex
     // dump, sets the editor read-only.  OFF: restores original content.

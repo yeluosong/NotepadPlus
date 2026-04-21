@@ -1,5 +1,6 @@
 #pragma once
 #include "Notepad_plus.h"
+#include "../Parameters/Parameters.h"
 #include "../ScintillaComponent/Buffer.h"
 #include <windows.h>
 #include <vector>
@@ -43,11 +44,15 @@ private:
     void ShowGoToLineDialog();
     void WireTabContextForView(int v);
     void ShowColumnEditorDialog();
+    void ShowTextComparePicker();
+    void ShowHexComparePicker();
 
     void CreateToolbar();
     void RebuildToolbar();
     int  ToolbarHeight() const;
-    void ToggleDarkMode();
+    void ApplyCurrentTheme();
+    void SetTheme(ThemeId t);
+    void CycleTheme();
 
     HINSTANCE      hInst_     = nullptr;
     HWND           hwnd_      = nullptr;

@@ -13,103 +13,183 @@ namespace npp {
 
 // ---- Shared UI palette ----------------------------------------------------
 namespace {
-    constexpr UiPalette kPaletteLight = {
-        /*chromeBg*/   RGB(0xEC,0xEE,0xF2),
-        /*editorBg*/   RGB(0xFA,0xFA,0xFA),
-        /*statusBg*/   RGB(0xE3,0xE5,0xE9),
-        /*border*/     RGB(0xD8,0xDA,0xDE),
-        /*text*/       RGB(0x1E,0x1E,0x1E),
-        /*textMuted*/  RGB(0x6B,0x71,0x80),
-        /*accent*/     RGB(0x2A,0x6D,0xF4),
-        /*accentDim*/  RGB(0x1D,0x5B,0xD6),
-        /*dirty*/      RGB(0xE5,0x48,0x4D),
-        /*caretLine*/  RGB(0xF0,0xF2,0xF5),
-        /*selection*/  RGB(0xAD,0xD6,0xFF),
-        /*hotBg*/      RGB(0xE0,0xE4,0xEC),
+    constexpr int kThemeCount = static_cast<int>(ThemeId::Count_);
+
+    constexpr UiPalette kUiPalettes[kThemeCount] = {
+        // 0  ModernLight (现代清爽 浅色)
+        { /*chromeBg*/   RGB(0xEC,0xEE,0xF2),
+          /*editorBg*/   RGB(0xFA,0xFA,0xFA),
+          /*statusBg*/   RGB(0xE3,0xE5,0xE9),
+          /*border*/     RGB(0xD8,0xDA,0xDE),
+          /*text*/       RGB(0x1E,0x1E,0x1E),
+          /*textMuted*/  RGB(0x6B,0x71,0x80),
+          /*accent*/     RGB(0x2A,0x6D,0xF4),
+          /*accentDim*/  RGB(0x1D,0x5B,0xD6),
+          /*dirty*/      RGB(0xE5,0x48,0x4D),
+          /*caretLine*/  RGB(0xF0,0xF2,0xF5),
+          /*selection*/  RGB(0xAD,0xD6,0xFF),
+          /*hotBg*/      RGB(0xE0,0xE4,0xEC) },
+        // 1  DarkPro (暗夜专业 深色)
+        { RGB(0x1B,0x1E,0x23), RGB(0x28,0x2C,0x34), RGB(0x16,0x18,0x1C),
+          RGB(0x10,0x12,0x16), RGB(0xD4,0xD8,0xE0), RGB(0x80,0x85,0x90),
+          RGB(0x4A,0x9E,0xFF), RGB(0x2F,0x82,0xE8), RGB(0xE0,0x6C,0x75),
+          RGB(0x2C,0x31,0x3A), RGB(0x3E,0x44,0x51), RGB(0x33,0x38,0x42) },
+        // 2  HighContrast (简洁高对比)
+        { RGB(0xF4,0xF4,0xF4), RGB(0xFF,0xFF,0xFF), RGB(0xE8,0xE8,0xE8),
+          RGB(0x90,0x90,0x90), RGB(0x00,0x00,0x00), RGB(0x44,0x44,0x44),
+          RGB(0x00,0x57,0xB7), RGB(0x00,0x40,0x90), RGB(0xC8,0x1D,0x25),
+          RGB(0xEE,0xF3,0xFA), RGB(0x99,0xC7,0xFF), RGB(0xDC,0xE4,0xEE) },
+        // 3  Mint (柔和护眼 墨绿)
+        { RGB(0xD6,0xE3,0xC9), RGB(0xE4,0xEF,0xDB), RGB(0xCB,0xDB,0xB8),
+          RGB(0xA8,0xBE,0x92), RGB(0x27,0x4E,0x37), RGB(0x5E,0x7B,0x5D),
+          RGB(0x3B,0x8E,0x5A), RGB(0x2A,0x6E,0x42), RGB(0xB3,0x50,0x3A),
+          RGB(0xDC,0xE8,0xC4), RGB(0xBE,0xD6,0x94), RGB(0xC9,0xD8,0xAE) },
+        // 4  Nordic (北欧极简 淡灰冷色)
+        { RGB(0xE2,0xE6,0xED), RGB(0xEC,0xEF,0xF4), RGB(0xD8,0xDE,0xE9),
+          RGB(0xB5,0xBE,0xCC), RGB(0x2E,0x34,0x40), RGB(0x61,0x6E,0x7E),
+          RGB(0x5E,0x81,0xAC), RGB(0x46,0x6A,0x94), RGB(0xBF,0x61,0x6A),
+          RGB(0xE5,0xEA,0xF0), RGB(0xBF,0xD3,0xE8), RGB(0xD8,0xDE,0xE9) },
+        // 5  DeepBlue (代码风格 深蓝科技) — chrome/editor/status share one navy
+        //     surface so the frame reads as a single block, not stacked strips.
+        { /*chromeBg*/  RGB(0x11,0x20,0x36),
+          /*editorBg*/  RGB(0x11,0x20,0x36),
+          /*statusBg*/  RGB(0x11,0x20,0x36),
+          /*border*/    RGB(0x22,0x36,0x54),
+          /*text*/      RGB(0xCD,0xD6,0xE4),
+          /*textMuted*/ RGB(0x7A,0x88,0x9E),
+          /*accent*/    RGB(0x4E,0xC9,0xB0),
+          /*accentDim*/ RGB(0x35,0xA6,0x92),
+          /*dirty*/     RGB(0xF0,0x7B,0x8A),
+          /*caretLine*/ RGB(0x18,0x2B,0x48),
+          /*selection*/ RGB(0x24,0x49,0x72),
+          /*hotBg*/     RGB(0x1D,0x31,0x4F) },
     };
-    constexpr UiPalette kPaletteDark = {
-        /*chromeBg*/   RGB(0x1B,0x1E,0x23),
-        /*editorBg*/   RGB(0x28,0x2C,0x34),
-        /*statusBg*/   RGB(0x16,0x18,0x1C),
-        /*border*/     RGB(0x10,0x12,0x16),
-        /*text*/       RGB(0xD4,0xD8,0xE0),
-        /*textMuted*/  RGB(0x80,0x85,0x90),
-        /*accent*/     RGB(0x4A,0x9E,0xFF),
-        /*accentDim*/  RGB(0x2F,0x82,0xE8),
-        /*dirty*/      RGB(0xE0,0x6C,0x75),
-        /*caretLine*/  RGB(0x2C,0x31,0x3A),
-        /*selection*/  RGB(0x3E,0x44,0x51),
-        /*hotBg*/      RGB(0x33,0x38,0x42),
+
+    constexpr IconPalette kIconPalettes[kThemeCount] = {
+        // 0  ModernLight: ink gray + sky-blue accent, white fill
+        { /*bg*/ RGB(0xFA,0xF7,0xF5), RGB(0x9A,0xA4,0xB0), RGB(0x6E,0xB4,0xEE),
+          RGB(0x4C,0x9A,0xD9), RGB(0xC8,0xCE,0xD6), RGB(0xFF,0xFF,0xFF),
+          RGB(0xE0,0x8A,0x8A) },
+        // 1  DarkPro: warm charcoal bg, cool ink
+        { RGB(0x2B,0x25,0x21), RGB(0x9A,0xA4,0xB0), RGB(0x6E,0xB4,0xEE),
+          RGB(0x4C,0x9A,0xD9), RGB(0x5C,0x63,0x70), RGB(0xE8,0xEB,0xF0),
+          RGB(0xE0,0x8A,0x8A) },
+        // 2  HighContrast: strong black ink on white
+        { RGB(0xF4,0xF4,0xF4), RGB(0x20,0x20,0x20), RGB(0x00,0x57,0xB7),
+          RGB(0x00,0x40,0x90), RGB(0x70,0x70,0x70), RGB(0xFF,0xFF,0xFF),
+          RGB(0xC8,0x1D,0x25) },
+        // 3  Mint: dark green ink on sage background
+        { RGB(0xD6,0xE3,0xC9), RGB(0x4E,0x6A,0x4F), RGB(0x3B,0x8E,0x5A),
+          RGB(0x2A,0x6E,0x42), RGB(0x95,0xA9,0x88), RGB(0xE4,0xEF,0xDB),
+          RGB(0xB3,0x50,0x3A) },
+        // 4  Nordic: slate ink + frost-blue accent
+        { RGB(0xE2,0xE6,0xED), RGB(0x4C,0x56,0x6A), RGB(0x5E,0x81,0xAC),
+          RGB(0x46,0x6A,0x94), RGB(0x9C,0xA8,0xBB), RGB(0xEC,0xEF,0xF4),
+          RGB(0xBF,0x61,0x6A) },
+        // 5  DeepBlue: teal-accent ink on deep blue (bg matches chromeBg).
+        { RGB(0x11,0x20,0x36), RGB(0x8A,0x99,0xAE), RGB(0x4E,0xC9,0xB0),
+          RGB(0x35,0xA6,0x92), RGB(0x4A,0x55,0x68), RGB(0xCD,0xD6,0xE4),
+          RGB(0xF0,0x7B,0x8A) },
     };
-}
 
-const UiPalette& Ui(bool dark) { return dark ? kPaletteDark : kPaletteLight; }
-const UiPalette& Ui() { return Ui(Parameters::Instance().DarkMode()); }
-
-namespace {
-
-// ---- Light theme palette ---------------------------------------------------
-namespace light {
-    constexpr COLORREF kFg        = RGB(0x00,0x00,0x00);
-    constexpr COLORREF kBg        = RGB(0xFA,0xFA,0xFA);
-    constexpr COLORREF kComment   = RGB(0x00,0x80,0x00);
-    constexpr COLORREF kNumber    = RGB(0xFF,0x80,0x00);
-    constexpr COLORREF kString    = RGB(0x80,0x80,0x80);
-    constexpr COLORREF kCharacter = RGB(0x80,0x80,0x80);
-    constexpr COLORREF kKeyword   = RGB(0x00,0x00,0xFF);
-    constexpr COLORREF kKeyword2  = RGB(0x80,0x00,0x80);
-    constexpr COLORREF kPreproc   = RGB(0x80,0x40,0x20);
-    constexpr COLORREF kOperator  = RGB(0x00,0x00,0x80);
-    constexpr COLORREF kIdentifier= RGB(0x00,0x00,0x00);
-    constexpr COLORREF kTagName   = RGB(0x80,0x00,0x00);
-    constexpr COLORREF kAttrName  = RGB(0xFF,0x00,0x00);
-    constexpr COLORREF kCaretLine = RGB(0xF0,0xF2,0xF5);
-    constexpr COLORREF kMargin    = RGB(0xF2,0xF3,0xF6);
-    constexpr COLORREF kMarginFg  = RGB(0x98,0xA0,0xAE);
-}
-
-// ---- Dark theme palette (One Dark inspired) --------------------------------
-namespace dark {
-    constexpr COLORREF kFg        = RGB(0xD4,0xD8,0xE0);
-    constexpr COLORREF kBg        = RGB(0x28,0x2C,0x34);
-    constexpr COLORREF kComment   = RGB(0x70,0x78,0x88);
-    constexpr COLORREF kNumber    = RGB(0xE0,0xAA,0x76);
-    constexpr COLORREF kString    = RGB(0xA8,0xD3,0x89);
-    constexpr COLORREF kCharacter = RGB(0xA8,0xD3,0x89);
-    constexpr COLORREF kKeyword   = RGB(0xD4,0x8C,0xE8);
-    constexpr COLORREF kKeyword2  = RGB(0xF0,0x80,0x88);
-    constexpr COLORREF kPreproc   = RGB(0xD4,0x8C,0xE8);
-    constexpr COLORREF kOperator  = RGB(0x6C,0xCC,0xD8);
-    constexpr COLORREF kIdentifier= RGB(0xD4,0xD8,0xE0);
-    constexpr COLORREF kTagName   = RGB(0xF0,0x80,0x88);
-    constexpr COLORREF kAttrName  = RGB(0xD1,0x9A,0x66);
-    constexpr COLORREF kCaretLine = RGB(0x2C,0x31,0x3A);
-    constexpr COLORREF kMargin    = RGB(0x1E,0x21,0x27);
-    constexpr COLORREF kMarginFg  = RGB(0x68,0x70,0x80);
-}
-
-// Active palette — set by ApplyLanguage before use.
-static COLORREF sFg, sBg, sComment, sNumber, sString, sCharacter;
-static COLORREF sKeyword, sKeyword2, sPreproc, sOperator, sIdentifier;
-static COLORREF sTagName, sAttrName, sCaretLine, sMargin, sMarginFg;
-
-static void SelectPalette(bool isDark) {
-    if (isDark) {
-        sFg = dark::kFg; sBg = dark::kBg; sComment = dark::kComment;
-        sNumber = dark::kNumber; sString = dark::kString; sCharacter = dark::kCharacter;
-        sKeyword = dark::kKeyword; sKeyword2 = dark::kKeyword2; sPreproc = dark::kPreproc;
-        sOperator = dark::kOperator; sIdentifier = dark::kIdentifier;
-        sTagName = dark::kTagName; sAttrName = dark::kAttrName;
-        sCaretLine = dark::kCaretLine; sMargin = dark::kMargin; sMarginFg = dark::kMarginFg;
-    } else {
-        sFg = light::kFg; sBg = light::kBg; sComment = light::kComment;
-        sNumber = light::kNumber; sString = light::kString; sCharacter = light::kCharacter;
-        sKeyword = light::kKeyword; sKeyword2 = light::kKeyword2; sPreproc = light::kPreproc;
-        sOperator = light::kOperator; sIdentifier = light::kIdentifier;
-        sTagName = light::kTagName; sAttrName = light::kAttrName;
-        sCaretLine = light::kCaretLine; sMargin = light::kMargin; sMarginFg = light::kMarginFg;
+    inline int ThemeIndex(ThemeId t) {
+        int i = static_cast<int>(t);
+        if (i < 0 || i >= kThemeCount) i = 0;
+        return i;
     }
 }
+
+const UiPalette& Ui(ThemeId t) { return kUiPalettes[ThemeIndex(t)]; }
+const UiPalette& Ui() { return Ui(Parameters::Instance().Theme()); }
+
+const IconPalette& Icons(ThemeId t) { return kIconPalettes[ThemeIndex(t)]; }
+const IconPalette& Icons() { return Icons(Parameters::Instance().Theme()); }
+
+// ---- Per-theme syntax palette --------------------------------------------
+namespace {
+
+struct SyntaxPalette {
+    COLORREF fg;         // default text
+    COLORREF bg;         // editor background (must match UiPalette.editorBg)
+    COLORREF comment;
+    COLORREF number;
+    COLORREF string;
+    COLORREF character;
+    COLORREF keyword;
+    COLORREF keyword2;   // secondary keyword / type
+    COLORREF preproc;
+    COLORREF op;
+    COLORREF identifier;
+    COLORREF tagName;
+    COLORREF attrName;
+    COLORREF caretLine;
+    COLORREF margin;
+    COLORREF marginFg;
+};
+
+constexpr SyntaxPalette kSyntax[kThemeCount] = {
+    // 0 ModernLight
+    { RGB(0x00,0x00,0x00), RGB(0xFA,0xFA,0xFA),
+      RGB(0x00,0x80,0x00), RGB(0xFF,0x80,0x00),
+      RGB(0x80,0x80,0x80), RGB(0x80,0x80,0x80),
+      RGB(0x00,0x00,0xFF), RGB(0x80,0x00,0x80),
+      RGB(0x80,0x40,0x20), RGB(0x00,0x00,0x80),
+      RGB(0x00,0x00,0x00), RGB(0x80,0x00,0x00),
+      RGB(0xFF,0x00,0x00),
+      RGB(0xF0,0xF2,0xF5), RGB(0xF2,0xF3,0xF6), RGB(0x98,0xA0,0xAE) },
+    // 1 DarkPro (One Dark inspired)
+    { RGB(0xD4,0xD8,0xE0), RGB(0x28,0x2C,0x34),
+      RGB(0x70,0x78,0x88), RGB(0xE0,0xAA,0x76),
+      RGB(0xA8,0xD3,0x89), RGB(0xA8,0xD3,0x89),
+      RGB(0xD4,0x8C,0xE8), RGB(0xF0,0x80,0x88),
+      RGB(0xD4,0x8C,0xE8), RGB(0x6C,0xCC,0xD8),
+      RGB(0xD4,0xD8,0xE0), RGB(0xF0,0x80,0x88),
+      RGB(0xD1,0x9A,0x66),
+      RGB(0x2C,0x31,0x3A), RGB(0x1E,0x21,0x27), RGB(0x68,0x70,0x80) },
+    // 2 HighContrast
+    { RGB(0x00,0x00,0x00), RGB(0xFF,0xFF,0xFF),
+      RGB(0x00,0x66,0x00), RGB(0xB0,0x45,0x00),
+      RGB(0x85,0x15,0x85), RGB(0x85,0x15,0x85),
+      RGB(0x00,0x00,0xC8), RGB(0x80,0x00,0x80),
+      RGB(0x80,0x20,0x00), RGB(0x00,0x00,0x80),
+      RGB(0x00,0x00,0x00), RGB(0x80,0x00,0x00),
+      RGB(0xC0,0x00,0x00),
+      RGB(0xEE,0xF3,0xFA), RGB(0xEE,0xEE,0xEE), RGB(0x66,0x66,0x66) },
+    // 3 Mint
+    { RGB(0x27,0x4E,0x37), RGB(0xE4,0xEF,0xDB),
+      RGB(0x6F,0x8C,0x5A), RGB(0xB0,0x6A,0x2A),
+      RGB(0x48,0x72,0x5A), RGB(0x48,0x72,0x5A),
+      RGB(0x2B,0x63,0x90), RGB(0x75,0x3E,0x8C),
+      RGB(0x8B,0x4A,0x2C), RGB(0x3F,0x67,0x52),
+      RGB(0x27,0x4E,0x37), RGB(0x6C,0x35,0x76),
+      RGB(0xB0,0x43,0x2E),
+      RGB(0xDC,0xE8,0xC4), RGB(0xDC,0xE8,0xCA), RGB(0x8A,0xA0,0x7E) },
+    // 4 Nordic
+    { RGB(0x2E,0x34,0x40), RGB(0xEC,0xEF,0xF4),
+      RGB(0x81,0x8F,0x9E), RGB(0xB4,0x8E,0x4D),
+      RGB(0xA3,0xBE,0x8C), RGB(0xA3,0xBE,0x8C),
+      RGB(0x5E,0x81,0xAC), RGB(0xB4,0x8E,0xAD),
+      RGB(0xD0,0x87,0x70), RGB(0x81,0xA1,0xC1),
+      RGB(0x2E,0x34,0x40), RGB(0xBF,0x61,0x6A),
+      RGB(0xEB,0xCB,0x8B),
+      RGB(0xE5,0xEA,0xF0), RGB(0xE2,0xE6,0xED), RGB(0x8D,0x99,0xAC) },
+    // 5 DeepBlue — bg + margin align with UiPalette so no seams appear.
+    { RGB(0xCD,0xD6,0xE4), RGB(0x11,0x20,0x36),
+      RGB(0x6A,0x93,0x55), RGB(0xE5,0xB8,0x73),
+      RGB(0xCE,0x91,0x78), RGB(0xCE,0x91,0x78),
+      RGB(0x56,0x9C,0xD6), RGB(0x4E,0xC9,0xB0),
+      RGB(0xC5,0x86,0xC0), RGB(0xD4,0xD4,0xD4),
+      RGB(0xCD,0xD6,0xE4), RGB(0x56,0x9C,0xD6),
+      RGB(0x9C,0xDC,0xFE),
+      RGB(0x18,0x2B,0x48), RGB(0x11,0x20,0x36), RGB(0x55,0x6B,0x88) },
+};
+
+inline const SyntaxPalette& Syntax(ThemeId t) { return kSyntax[ThemeIndex(t)]; }
+
+// Active palette — set by ApplyLanguage before use.
+static SyntaxPalette sP;
+
+static void SelectPalette(ThemeId t) { sP = Syntax(t); }
 
 void SetStyle(ScintillaEditView& v, int style, COLORREF fg, COLORREF bg)
 {
@@ -118,7 +198,7 @@ void SetStyle(ScintillaEditView& v, int style, COLORREF fg, COLORREF bg)
 }
 void SetStyle(ScintillaEditView& v, int style, COLORREF fg)
 {
-    SetStyle(v, style, fg, sBg);
+    SetStyle(v, style, fg, sP.bg);
 }
 
 void ResetStyles(ScintillaEditView& v)
@@ -127,46 +207,36 @@ void ResetStyles(ScintillaEditView& v)
     v.Call(SCI_STYLESETFONT, STYLE_DEFAULT,
         reinterpret_cast<sptr_t>("Cascadia Mono"));
     v.Call(SCI_STYLESETSIZE, STYLE_DEFAULT, 11);
-    SetStyle(v, STYLE_DEFAULT, sFg, sBg);
+    SetStyle(v, STYLE_DEFAULT, sP.fg, sP.bg);
     v.Call(SCI_STYLECLEARALL);
 
-    // Caret line highlight
-    v.Call(SCI_SETCARETLINEBACK, static_cast<uptr_t>(sCaretLine));
+    v.Call(SCI_SETCARETLINEBACK, static_cast<uptr_t>(sP.caretLine));
     v.Call(SCI_SETCARETLINEVISIBLE, 1);
+    v.Call(SCI_SETCARETFORE, static_cast<uptr_t>(sP.fg));
 
-    // Caret color
-    v.Call(SCI_SETCARETFORE, static_cast<uptr_t>(sFg));
+    v.Call(SCI_STYLESETFORE, STYLE_LINENUMBER, static_cast<sptr_t>(sP.marginFg));
+    v.Call(SCI_STYLESETBACK, STYLE_LINENUMBER, static_cast<sptr_t>(sP.margin));
 
-    // Line number margin
-    v.Call(SCI_STYLESETFORE, STYLE_LINENUMBER, static_cast<sptr_t>(sMarginFg));
-    v.Call(SCI_STYLESETBACK, STYLE_LINENUMBER, static_cast<sptr_t>(sMargin));
-
-    // Caret line: subtle background + bold 2px left strip via SC_ELEMENT_CARET_LINE_BACK
-    // (Scintilla 5 supports EDGE layer, we keep legacy call for compat).
     v.Call(SCI_SETCARETLINEFRAME, 0);
     v.Call(SCI_SETCARETWIDTH, 2);
 
-    // Selection colors — let fg follow syntax colors (no forced override)
-    bool isDark = Parameters::Instance().DarkMode();
-    const UiPalette& u = Ui(isDark);
+    ThemeId tid = Parameters::Instance().Theme();
+    const UiPalette& u = Ui(tid);
     v.Call(SCI_SETSELBACK, 1, static_cast<sptr_t>(u.selection));
     v.Call(SCI_SETSELFORE, 0, 0);
 
-    // Bracket matching: use underline+bold instead of a filled background
-    COLORREF braceFg = isDark ? RGB(0xE5,0xC0,0x7B) : RGB(0x00,0x66,0xCC);
-    v.Call(SCI_STYLESETFORE, STYLE_BRACELIGHT, static_cast<sptr_t>(braceFg));
-    v.Call(SCI_STYLESETBACK, STYLE_BRACELIGHT, static_cast<sptr_t>(sBg));
+    // Bracket matching uses accent fore + underline/bold.
+    v.Call(SCI_STYLESETFORE, STYLE_BRACELIGHT, static_cast<sptr_t>(u.accent));
+    v.Call(SCI_STYLESETBACK, STYLE_BRACELIGHT, static_cast<sptr_t>(sP.bg));
     v.Call(SCI_STYLESETBOLD, STYLE_BRACELIGHT, 1);
     v.Call(SCI_STYLESETUNDERLINE, STYLE_BRACELIGHT, 1);
     v.Call(SCI_STYLESETFORE, STYLE_BRACEBAD, static_cast<sptr_t>(u.dirty));
     v.Call(SCI_STYLESETBOLD, STYLE_BRACEBAD, 1);
 
-    // Whitespace dots subdued
     v.Call(SCI_SETWHITESPACEFORE, 1, static_cast<sptr_t>(u.textMuted));
 
-    // Fold margin
-    v.Call(SCI_SETFOLDMARGINCOLOUR, 1, static_cast<sptr_t>(sBg));
-    v.Call(SCI_SETFOLDMARGINHICOLOUR, 1, static_cast<sptr_t>(sBg));
+    v.Call(SCI_SETFOLDMARGINCOLOUR, 1, static_cast<sptr_t>(sP.bg));
+    v.Call(SCI_SETFOLDMARGINHICOLOUR, 1, static_cast<sptr_t>(sP.bg));
 }
 
 void ApplyKeywords(ScintillaEditView& v, int keywordSet, const char* words)
@@ -175,22 +245,20 @@ void ApplyKeywords(ScintillaEditView& v, int keywordSet, const char* words)
         reinterpret_cast<sptr_t>(words));
 }
 
-// --- per-language style hook tables -----------------------------------------
-
 void StyleCpp(ScintillaEditView& v)
 {
-    SetStyle(v, SCE_C_COMMENT,       sComment);
-    SetStyle(v, SCE_C_COMMENTLINE,   sComment);
-    SetStyle(v, SCE_C_COMMENTDOC,    sComment);
-    SetStyle(v, SCE_C_COMMENTLINEDOC,sComment);
-    SetStyle(v, SCE_C_NUMBER,        sNumber);
-    SetStyle(v, SCE_C_WORD,          sKeyword);
-    SetStyle(v, SCE_C_WORD2,         sKeyword2);
-    SetStyle(v, SCE_C_STRING,        sString);
-    SetStyle(v, SCE_C_CHARACTER,     sCharacter);
-    SetStyle(v, SCE_C_OPERATOR,      sOperator);
-    SetStyle(v, SCE_C_IDENTIFIER,    sIdentifier);
-    SetStyle(v, SCE_C_PREPROCESSOR,  sPreproc);
+    SetStyle(v, SCE_C_COMMENT,       sP.comment);
+    SetStyle(v, SCE_C_COMMENTLINE,   sP.comment);
+    SetStyle(v, SCE_C_COMMENTDOC,    sP.comment);
+    SetStyle(v, SCE_C_COMMENTLINEDOC,sP.comment);
+    SetStyle(v, SCE_C_NUMBER,        sP.number);
+    SetStyle(v, SCE_C_WORD,          sP.keyword);
+    SetStyle(v, SCE_C_WORD2,         sP.keyword2);
+    SetStyle(v, SCE_C_STRING,        sP.string);
+    SetStyle(v, SCE_C_CHARACTER,     sP.character);
+    SetStyle(v, SCE_C_OPERATOR,      sP.op);
+    SetStyle(v, SCE_C_IDENTIFIER,    sP.identifier);
+    SetStyle(v, SCE_C_PREPROCESSOR,  sP.preproc);
 
     ApplyKeywords(v, 0,
         "alignas alignof and and_eq asm auto bitand bitor bool break case catch "
@@ -207,18 +275,18 @@ void StyleCpp(ScintillaEditView& v)
 
 void StylePython(ScintillaEditView& v)
 {
-    SetStyle(v, SCE_P_COMMENTLINE,  sComment);
-    SetStyle(v, SCE_P_COMMENTBLOCK, sComment);
-    SetStyle(v, SCE_P_NUMBER,       sNumber);
-    SetStyle(v, SCE_P_WORD,         sKeyword);
-    SetStyle(v, SCE_P_STRING,       sString);
-    SetStyle(v, SCE_P_CHARACTER,    sCharacter);
-    SetStyle(v, SCE_P_OPERATOR,     sOperator);
-    SetStyle(v, SCE_P_IDENTIFIER,   sIdentifier);
-    SetStyle(v, SCE_P_TRIPLE,       sString);
-    SetStyle(v, SCE_P_TRIPLEDOUBLE, sString);
-    SetStyle(v, SCE_P_DEFNAME,      sKeyword2);
-    SetStyle(v, SCE_P_CLASSNAME,    sKeyword2);
+    SetStyle(v, SCE_P_COMMENTLINE,  sP.comment);
+    SetStyle(v, SCE_P_COMMENTBLOCK, sP.comment);
+    SetStyle(v, SCE_P_NUMBER,       sP.number);
+    SetStyle(v, SCE_P_WORD,         sP.keyword);
+    SetStyle(v, SCE_P_STRING,       sP.string);
+    SetStyle(v, SCE_P_CHARACTER,    sP.character);
+    SetStyle(v, SCE_P_OPERATOR,     sP.op);
+    SetStyle(v, SCE_P_IDENTIFIER,   sP.identifier);
+    SetStyle(v, SCE_P_TRIPLE,       sP.string);
+    SetStyle(v, SCE_P_TRIPLEDOUBLE, sP.string);
+    SetStyle(v, SCE_P_DEFNAME,      sP.keyword2);
+    SetStyle(v, SCE_P_CLASSNAME,    sP.keyword2);
 
     ApplyKeywords(v, 0,
         "False None True and as assert async await break class continue def del "
@@ -228,42 +296,42 @@ void StylePython(ScintillaEditView& v)
 
 void StyleHtml(ScintillaEditView& v)
 {
-    SetStyle(v, SCE_H_TAG,          sTagName);
-    SetStyle(v, SCE_H_TAGUNKNOWN,   sTagName);
-    SetStyle(v, SCE_H_ATTRIBUTE,    sAttrName);
-    SetStyle(v, SCE_H_DOUBLESTRING, sString);
-    SetStyle(v, SCE_H_SINGLESTRING, sString);
-    SetStyle(v, SCE_H_COMMENT,      sComment);
-    SetStyle(v, SCE_H_NUMBER,       sNumber);
-    SetStyle(v, SCE_H_ENTITY,       sKeyword2);
-    SetStyle(v, SCE_H_TAGEND,       sOperator);
-    SetStyle(v, SCE_H_XMLSTART,     sTagName);
-    SetStyle(v, SCE_H_XMLEND,       sTagName);
+    SetStyle(v, SCE_H_TAG,          sP.tagName);
+    SetStyle(v, SCE_H_TAGUNKNOWN,   sP.tagName);
+    SetStyle(v, SCE_H_ATTRIBUTE,    sP.attrName);
+    SetStyle(v, SCE_H_DOUBLESTRING, sP.string);
+    SetStyle(v, SCE_H_SINGLESTRING, sP.string);
+    SetStyle(v, SCE_H_COMMENT,      sP.comment);
+    SetStyle(v, SCE_H_NUMBER,       sP.number);
+    SetStyle(v, SCE_H_ENTITY,       sP.keyword2);
+    SetStyle(v, SCE_H_TAGEND,       sP.op);
+    SetStyle(v, SCE_H_XMLSTART,     sP.tagName);
+    SetStyle(v, SCE_H_XMLEND,       sP.tagName);
 }
 
 void StyleCss(ScintillaEditView& v)
 {
-    SetStyle(v, SCE_CSS_COMMENT,          sComment);
-    SetStyle(v, SCE_CSS_TAG,              sTagName);
-    SetStyle(v, SCE_CSS_CLASS,            sKeyword2);
-    SetStyle(v, SCE_CSS_PSEUDOCLASS,      sKeyword2);
-    SetStyle(v, SCE_CSS_IDENTIFIER,       sKeyword);
-    SetStyle(v, SCE_CSS_DOUBLESTRING,     sString);
-    SetStyle(v, SCE_CSS_SINGLESTRING,     sString);
-    SetStyle(v, SCE_CSS_OPERATOR,         sOperator);
-    SetStyle(v, SCE_CSS_VALUE,            sIdentifier);
-    SetStyle(v, SCE_CSS_IMPORTANT,        sKeyword);
+    SetStyle(v, SCE_CSS_COMMENT,          sP.comment);
+    SetStyle(v, SCE_CSS_TAG,              sP.tagName);
+    SetStyle(v, SCE_CSS_CLASS,            sP.keyword2);
+    SetStyle(v, SCE_CSS_PSEUDOCLASS,      sP.keyword2);
+    SetStyle(v, SCE_CSS_IDENTIFIER,       sP.keyword);
+    SetStyle(v, SCE_CSS_DOUBLESTRING,     sP.string);
+    SetStyle(v, SCE_CSS_SINGLESTRING,     sP.string);
+    SetStyle(v, SCE_CSS_OPERATOR,         sP.op);
+    SetStyle(v, SCE_CSS_VALUE,            sP.identifier);
+    SetStyle(v, SCE_CSS_IMPORTANT,        sP.keyword);
 }
 
 void StyleJson(ScintillaEditView& v)
 {
-    SetStyle(v, SCE_JSON_NUMBER,          sNumber);
-    SetStyle(v, SCE_JSON_STRING,          sString);
-    SetStyle(v, SCE_JSON_PROPERTYNAME,    sKeyword2);
-    SetStyle(v, SCE_JSON_KEYWORD,         sKeyword);
-    SetStyle(v, SCE_JSON_LINECOMMENT,     sComment);
-    SetStyle(v, SCE_JSON_BLOCKCOMMENT,    sComment);
-    SetStyle(v, SCE_JSON_OPERATOR,        sOperator);
+    SetStyle(v, SCE_JSON_NUMBER,          sP.number);
+    SetStyle(v, SCE_JSON_STRING,          sP.string);
+    SetStyle(v, SCE_JSON_PROPERTYNAME,    sP.keyword2);
+    SetStyle(v, SCE_JSON_KEYWORD,         sP.keyword);
+    SetStyle(v, SCE_JSON_LINECOMMENT,     sP.comment);
+    SetStyle(v, SCE_JSON_BLOCKCOMMENT,    sP.comment);
+    SetStyle(v, SCE_JSON_OPERATOR,        sP.op);
 }
 
 void StyleXml(ScintillaEditView& v)
@@ -273,14 +341,14 @@ void StyleXml(ScintillaEditView& v)
 
 void StyleBash(ScintillaEditView& v)
 {
-    SetStyle(v, SCE_SH_COMMENTLINE, sComment);
-    SetStyle(v, SCE_SH_NUMBER,      sNumber);
-    SetStyle(v, SCE_SH_WORD,        sKeyword);
-    SetStyle(v, SCE_SH_STRING,      sString);
-    SetStyle(v, SCE_SH_CHARACTER,   sCharacter);
-    SetStyle(v, SCE_SH_OPERATOR,    sOperator);
-    SetStyle(v, SCE_SH_IDENTIFIER,  sIdentifier);
-    SetStyle(v, SCE_SH_SCALAR,      sKeyword2);
+    SetStyle(v, SCE_SH_COMMENTLINE, sP.comment);
+    SetStyle(v, SCE_SH_NUMBER,      sP.number);
+    SetStyle(v, SCE_SH_WORD,        sP.keyword);
+    SetStyle(v, SCE_SH_STRING,      sP.string);
+    SetStyle(v, SCE_SH_CHARACTER,   sP.character);
+    SetStyle(v, SCE_SH_OPERATOR,    sP.op);
+    SetStyle(v, SCE_SH_IDENTIFIER,  sP.identifier);
+    SetStyle(v, SCE_SH_SCALAR,      sP.keyword2);
 
     ApplyKeywords(v, 0,
         "if then else elif fi case esac for while until do done in function "
@@ -290,22 +358,48 @@ void StyleBash(ScintillaEditView& v)
 
 void StyleMarkdown(ScintillaEditView& v)
 {
-    bool isDark = Parameters::Instance().DarkMode();
+    ThemeId tid = Parameters::Instance().Theme();
+    bool isDark = IsDarkFamily(tid);
 
-    // Headers H1..H6
     constexpr int hStyles[6] = {
         SCE_MARKDOWN_HEADER1, SCE_MARKDOWN_HEADER2, SCE_MARKDOWN_HEADER3,
         SCE_MARKDOWN_HEADER4, SCE_MARKDOWN_HEADER5, SCE_MARKDOWN_HEADER6,
     };
+    // Per-theme header color ramps. Headers always stay saturated so
+    // structure reads even against muted backgrounds.
     COLORREF hColors[6];
-    if (isDark) {
+    switch (tid) {
+    case ThemeId::DarkPro:
         hColors[0] = RGB(0xE0,0x6C,0x75); hColors[1] = RGB(0xD1,0x9A,0x66);
         hColors[2] = RGB(0xE5,0xC0,0x7B); hColors[3] = RGB(0x98,0xC3,0x79);
         hColors[4] = RGB(0x61,0xAF,0xEF); hColors[5] = RGB(0xC6,0x78,0xDD);
-    } else {
+        break;
+    case ThemeId::DeepBlue:
+        hColors[0] = RGB(0x4E,0xC9,0xB0); hColors[1] = RGB(0x56,0x9C,0xD6);
+        hColors[2] = RGB(0x9C,0xDC,0xFE); hColors[3] = RGB(0xCE,0x91,0x78);
+        hColors[4] = RGB(0xC5,0x86,0xC0); hColors[5] = RGB(0xDC,0xDC,0xAA);
+        break;
+    case ThemeId::Mint:
+        hColors[0] = RGB(0x1E,0x5E,0x3A); hColors[1] = RGB(0x35,0x72,0x48);
+        hColors[2] = RGB(0x4E,0x87,0x56); hColors[3] = RGB(0x66,0x9B,0x62);
+        hColors[4] = RGB(0x7B,0xAF,0x6F); hColors[5] = RGB(0x8F,0xBF,0x7C);
+        break;
+    case ThemeId::Nordic:
+        hColors[0] = RGB(0xBF,0x61,0x6A); hColors[1] = RGB(0xD0,0x87,0x70);
+        hColors[2] = RGB(0xEB,0xCB,0x8B); hColors[3] = RGB(0xA3,0xBE,0x8C);
+        hColors[4] = RGB(0x5E,0x81,0xAC); hColors[5] = RGB(0xB4,0x8E,0xAD);
+        break;
+    case ThemeId::HighContrast:
+        hColors[0] = RGB(0xA0,0x00,0x00); hColors[1] = RGB(0x80,0x2A,0x00);
+        hColors[2] = RGB(0x60,0x55,0x00); hColors[3] = RGB(0x00,0x60,0x20);
+        hColors[4] = RGB(0x00,0x40,0x90); hColors[5] = RGB(0x5A,0x00,0x7A);
+        break;
+    case ThemeId::ModernLight:
+    default:
         hColors[0] = RGB(0xC9,0x4A,0x1A); hColors[1] = RGB(0xC9,0x6B,0x2C);
         hColors[2] = RGB(0xB5,0x6E,0x2E); hColors[3] = RGB(0x8E,0x5E,0x2E);
         hColors[4] = RGB(0x6E,0x4E,0x2E); hColors[5] = RGB(0x55,0x40,0x28);
+        break;
     }
     for (int i = 0; i < 6; ++i) {
         SetStyle(v, hStyles[i], hColors[i]);
@@ -313,42 +407,37 @@ void StyleMarkdown(ScintillaEditView& v)
         v.Call(SCI_STYLESETSIZE, hStyles[i], 14 - i);
     }
 
-    // Emphasis
-    COLORREF emClr = isDark ? RGB(0xBB,0xC2,0xCF) : RGB(0x20,0x20,0x20);
-    SetStyle(v, SCE_MARKDOWN_EM1,           emClr);
+    COLORREF emClr = isDark ? RGB(0xBB,0xC2,0xCF) : sP.fg;
+    SetStyle(v, SCE_MARKDOWN_EM1,     emClr);
     v.Call(SCI_STYLESETITALIC, SCE_MARKDOWN_EM1, 1);
-    SetStyle(v, SCE_MARKDOWN_EM2,           emClr);
+    SetStyle(v, SCE_MARKDOWN_EM2,     emClr);
     v.Call(SCI_STYLESETITALIC, SCE_MARKDOWN_EM2, 1);
-    SetStyle(v, SCE_MARKDOWN_STRONG1,       emClr);
+    SetStyle(v, SCE_MARKDOWN_STRONG1, emClr);
     v.Call(SCI_STYLESETBOLD,   SCE_MARKDOWN_STRONG1, 1);
-    SetStyle(v, SCE_MARKDOWN_STRONG2,       emClr);
+    SetStyle(v, SCE_MARKDOWN_STRONG2, emClr);
     v.Call(SCI_STYLESETBOLD,   SCE_MARKDOWN_STRONG2, 1);
 
-    // Code (inline + block)
-    COLORREF codeFg = isDark ? RGB(0xD1,0x9A,0x66) : RGB(0x80,0x40,0x20);
-    COLORREF codeBg = isDark ? RGB(0x2E,0x33,0x3D) : RGB(0xF6,0xEE,0xDC);
-    SetStyle(v, SCE_MARKDOWN_CODE,          codeFg, codeBg);
-    SetStyle(v, SCE_MARKDOWN_CODE2,         codeFg, codeBg);
-    SetStyle(v, SCE_MARKDOWN_CODEBK,        codeFg, codeBg);
+    // Code block: tinted from the theme's caret line (already on-theme).
+    COLORREF codeFg = sP.preproc;
+    COLORREF codeBg = sP.caretLine;
+    SetStyle(v, SCE_MARKDOWN_CODE,    codeFg, codeBg);
+    SetStyle(v, SCE_MARKDOWN_CODE2,   codeFg, codeBg);
+    SetStyle(v, SCE_MARKDOWN_CODEBK,  codeFg, codeBg);
 
-    // Lists, blockquote, rules, links
-    SetStyle(v, SCE_MARKDOWN_PRECHAR,       sKeyword2);
-    SetStyle(v, SCE_MARKDOWN_ULIST_ITEM,    sKeyword);
-    SetStyle(v, SCE_MARKDOWN_OLIST_ITEM,    sKeyword);
-    COLORREF bqClr = isDark ? RGB(0x5C,0x63,0x70) : RGB(0x60,0x60,0x60);
-    SetStyle(v, SCE_MARKDOWN_BLOCKQUOTE,    bqClr);
+    SetStyle(v, SCE_MARKDOWN_PRECHAR,     sP.keyword2);
+    SetStyle(v, SCE_MARKDOWN_ULIST_ITEM,  sP.keyword);
+    SetStyle(v, SCE_MARKDOWN_OLIST_ITEM,  sP.keyword);
+    SetStyle(v, SCE_MARKDOWN_BLOCKQUOTE,  sP.comment);
     v.Call(SCI_STYLESETITALIC, SCE_MARKDOWN_BLOCKQUOTE, 1);
-    COLORREF soClr = isDark ? RGB(0x5C,0x63,0x70) : RGB(0x80,0x80,0x80);
-    SetStyle(v, SCE_MARKDOWN_STRIKEOUT,     soClr);
-    SetStyle(v, SCE_MARKDOWN_HRULE,         sKeyword2);
-    COLORREF linkClr = isDark ? RGB(0x61,0xAF,0xEF) : RGB(0x00,0x66,0xCC);
-    SetStyle(v, SCE_MARKDOWN_LINK,          linkClr);
+    SetStyle(v, SCE_MARKDOWN_STRIKEOUT,   sP.comment);
+    SetStyle(v, SCE_MARKDOWN_HRULE,       sP.keyword2);
+
+    const UiPalette& u = Ui(tid);
+    SetStyle(v, SCE_MARKDOWN_LINK, u.accent);
     v.Call(SCI_STYLESETUNDERLINE, SCE_MARKDOWN_LINK, 1);
 }
 
 void StyleGeneric(ScintillaEditView& /*v*/) { /* no-op */ }
-
-// ---------------------------------------------------------------------------
 
 void SetLexerByName(ScintillaEditView& v, const char* lexerName)
 {
@@ -364,7 +453,7 @@ void SetLexerByName(ScintillaEditView& v, const char* lexerName)
 
 void ApplyLanguage(ScintillaEditView& v, LangType lang)
 {
-    SelectPalette(Parameters::Instance().DarkMode());
+    SelectPalette(Parameters::Instance().Theme());
     ResetStyles(v);
     SetLexerByName(v, LangLexerName(lang));
 

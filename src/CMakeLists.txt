@@ -22,7 +22,13 @@ set(NPP_SOURCES
     Parameters/LangType.cpp
     Parameters/Stylers.cpp
     Diff/LineDiff.cpp
-    Diff/CompareController.cpp
+    Diff/TextCompareWindow.cpp
+    Diff/FileMapping.cpp
+    Diff/HexCompareView.cpp
+    Diff/HexCompareWindow.cpp
+    Diff/FolderScanner.cpp
+    Diff/FolderCompareView.cpp
+    Diff/FolderCompareWindow.cpp
 )
 
 set(NPP_HEADERS
@@ -46,7 +52,13 @@ set(NPP_HEADERS
     Parameters/LangType.h
     Parameters/Stylers.h
     Diff/LineDiff.h
-    Diff/CompareController.h
+    Diff/TextCompareWindow.h
+    Diff/FileMapping.h
+    Diff/HexCompareView.h
+    Diff/HexCompareWindow.h
+    Diff/FolderScanner.h
+    Diff/FolderCompareView.h
+    Diff/FolderCompareWindow.h
     resource.h
 )
 

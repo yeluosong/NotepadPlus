@@ -4,6 +4,10 @@
 #include "../Parameters/Stylers.h"
 #include "../ScintillaComponent/BufferManager.h"
 #include "../MISC/Common/StringUtil.h"
+#include "../MISC/Common/FileIO.h"
+#include "../Diff/TextCompareWindow.h"
+#include "../Diff/HexCompareWindow.h"
+#include "../Diff/FolderCompareWindow.h"
 #include "../resource.h"
 
 #include <Scintilla.h>
@@ -14,6 +18,7 @@
 #include <shlwapi.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <commdlg.h>
 #include <dwmapi.h>
 #include <string>
 #include <vector>
@@ -84,12 +89,13 @@ static HBRUSH GetChromeBrush()
     return g_chromeBrush;
 }
 
-static void ApplyDarkToFrame(HWND hwnd, HWND statusBar, HWND toolbar, bool dark)
+static void ApplyFrameTheme(HWND hwnd, HWND statusBar, HWND toolbar)
 {
-    SetTitleBarDark(hwnd, dark);
+    bool isDarkFam = Parameters::Instance().DarkMode();
+    SetTitleBarDark(hwnd, isDarkFam);
     GetChromeBrush();  // refresh for current theme
 
-    const UiPalette& u = Ui(dark);
+    const UiPalette& u = Ui();
 
     if (toolbar) {
         ::InvalidateRect(toolbar, nullptr, TRUE);
@@ -396,10 +402,12 @@ namespace {
         }
 
         // (Re)configure the indicator each call — cheap, makes per-buffer use safe.
+        // Follows the theme's accent so the highlight always reads as "same family"
+        // as selection/tabs rather than a hard-coded orange.
         ed.Call(SCI_INDICSETSTYLE, kSmartHighlightIndic, INDIC_ROUNDBOX);
-        ed.Call(SCI_INDICSETFORE,  kSmartHighlightIndic, 0x60C8FF); // warm orange (BGR)
-        ed.Call(SCI_INDICSETALPHA, kSmartHighlightIndic, 90);
-        ed.Call(SCI_INDICSETOUTLINEALPHA, kSmartHighlightIndic, 160);
+        ed.Call(SCI_INDICSETFORE,  kSmartHighlightIndic, Ui().accent);
+        ed.Call(SCI_INDICSETALPHA, kSmartHighlightIndic, 70);
+        ed.Call(SCI_INDICSETOUTLINEALPHA, kSmartHighlightIndic, 140);
         ed.Call(SCI_SETINDICATORCURRENT, kSmartHighlightIndic);
 
         sptr_t docLen = ed.Call(SCI_GETLENGTH);
@@ -594,7 +602,7 @@ void Notepad_plus_Window::OnCreate(HWND h)
     // Win11 rounded corners + Mica backdrop (silently ignored pre-22H2).
     ApplyWin11Chrome(h);
     // Apply theme (light or dark) to frame chrome.
-    ApplyDarkToFrame(h, statusBar_, toolbar_, Parameters::Instance().DarkMode());
+    ApplyFrameTheme(h, statusBar_, toolbar_);
 
     // If WinMain handed us files (shell association, drag-onto-exe, terminal),
     // open them instead of creating the placeholder "new 1" tab — otherwise
@@ -784,9 +792,11 @@ void Notepad_plus_Window::UpdateCheckedMenus()
     UINT lastLang  = IDM_LANG_BASE + static_cast<UINT>(LangType::Count_) - 1;
     UINT activeCmd = IDM_LANG_BASE + static_cast<UINT>(b->GetLang());
     ::CheckMenuRadioItem(bar, firstLang, lastLang, activeCmd, MF_BYCOMMAND);
-    // Dark mode toggle.
-    ::CheckMenuItem(bar, IDM_VIEW_DARKMODE,
-        MF_BYCOMMAND | (Parameters::Instance().DarkMode() ? MF_CHECKED : MF_UNCHECKED));
+    // Theme radio group.
+    UINT themeCmd = IDM_VIEW_THEME_BASE +
+        static_cast<UINT>(Parameters::Instance().Theme());
+    ::CheckMenuRadioItem(bar, IDM_VIEW_THEME_BASE, IDM_VIEW_THEME_LAST,
+        themeCmd, MF_BYCOMMAND);
 }
 
 void Notepad_plus_Window::ShowGoToLineDialog()
@@ -900,9 +910,8 @@ struct IconCanvas {
     int w = 16, h = 16;
     std::vector<Px> px;
     IconCanvas() {
-        bool isDark = Parameters::Instance().DarkMode();
-        Px fill = isDark ? Px{0x2B, 0x25, 0x21, 0xFF}   // dark bg
-                         : Px{0xFA, 0xF7, 0xF5, 0xFF};  // light bg
+        COLORREF bg = Icons().bg;
+        Px fill{ GetBValue(bg), GetGValue(bg), GetRValue(bg), 0xFF };
         px.assign(16 * 16, fill);
     }
     void Dot(int x, int y, COLORREF c, uint8_t a = 255) {
@@ -947,15 +956,15 @@ HBITMAP CanvasToBitmap(const IconCanvas& c)
 }
 
 // Each drawer renders one 16×16 icon into `c`.
-// Flat outline 16×16 toolbar icons matching the neutral gray + Windows
-// accent blue used across the rest of the UI.
+// Flat outline 16×16 toolbar icons. Ink/accent/fill resolve from the active
+// theme's IconPalette, so icons always blend with the surrounding toolbar.
 namespace clr {
-    constexpr COLORREF kInk    = RGB(0x9A,0xA4,0xB0);  // light gray outline
-    constexpr COLORREF kAccent = RGB(0x6E,0xB4,0xEE);  // soft sky blue
-    constexpr COLORREF kAccDk  = RGB(0x4C,0x9A,0xD9);
-    constexpr COLORREF kMute   = RGB(0xC8,0xCE,0xD6);  // very light secondary
-    constexpr COLORREF kFill   = RGB(0xFF,0xFF,0xFF);  // page interior
-    constexpr COLORREF kRed    = RGB(0xE0,0x8A,0x8A);  // soft pinkish red
+    inline COLORREF kInk()    { return Icons().ink; }
+    inline COLORREF kAccent() { return Icons().accent; }
+    inline COLORREF kAccDk()  { return Icons().accentDk; }
+    inline COLORREF kMute()   { return Icons().mute; }
+    inline COLORREF kFill()   { return Icons().fill; }
+    inline COLORREF kRed()    { return Icons().red; }
 }
 
 // All icons follow the same convention: ink outlines in kInk, accent
@@ -964,96 +973,96 @@ namespace clr {
 
 void DrawPageOutline(IconCanvas& c)
 {
-    c.Fill(3, 2, 11, 13, clr::kFill);
-    c.Rect(3, 2, 11, 13, clr::kInk);
-    c.HLine(9, 11, 4, clr::kInk);
-    c.VLine(11, 2, 4, clr::kInk);
-    c.Dot(10, 3, clr::kInk); c.Dot(9, 3, clr::kInk);
-    c.HLine(5, 9, 7,  clr::kMute);
-    c.HLine(5, 9, 9,  clr::kMute);
-    c.HLine(5, 10, 11, clr::kMute);
+    c.Fill(3, 2, 11, 13, clr::kFill());
+    c.Rect(3, 2, 11, 13, clr::kInk());
+    c.HLine(9, 11, 4, clr::kInk());
+    c.VLine(11, 2, 4, clr::kInk());
+    c.Dot(10, 3, clr::kInk()); c.Dot(9, 3, clr::kInk());
+    c.HLine(5, 9, 7,  clr::kMute());
+    c.HLine(5, 9, 9,  clr::kMute());
+    c.HLine(5, 10, 11, clr::kMute());
 }
 void DrawNew(IconCanvas& c) {
     DrawPageOutline(c);
     // Accent plus badge, bottom-right.
-    c.Fill(9, 9, 14, 14, clr::kAccent);
-    c.HLine(10, 12, 11, clr::kFill);
-    c.HLine(10, 12, 12, clr::kFill);
-    c.VLine(11, 10, 13, clr::kFill);
-    c.VLine(12, 10, 13, clr::kFill);
+    c.Fill(9, 9, 14, 14, clr::kAccent());
+    c.HLine(10, 12, 11, clr::kFill());
+    c.HLine(10, 12, 12, clr::kFill());
+    c.VLine(11, 10, 13, clr::kFill());
+    c.VLine(12, 10, 13, clr::kFill());
 }
 void DrawOpen(IconCanvas& c) {
     // Outline folder; accent only on the front face top edge.
-    c.Rect(1, 5, 7, 7, clr::kInk);
-    c.Rect(1, 6, 14, 13, clr::kInk);
-    c.Fill(2, 7, 13, 12, clr::kFill);
-    c.HLine(1, 14, 6, clr::kAccent);
+    c.Rect(1, 5, 7, 7, clr::kInk());
+    c.Rect(1, 6, 14, 13, clr::kInk());
+    c.Fill(2, 7, 13, 12, clr::kFill());
+    c.HLine(1, 14, 6, clr::kAccent());
 }
 void DrawSave(IconCanvas& c) {
     // Outline floppy with accent shutter.
-    c.Rect(2, 2, 13, 13, clr::kInk);
-    c.Fill(3, 3, 12, 12, clr::kFill);
+    c.Rect(2, 2, 13, 13, clr::kInk());
+    c.Fill(3, 3, 12, 12, clr::kFill());
     // Shutter strip top in accent.
-    c.Fill(4, 3, 11, 6, clr::kAccent);
-    c.Fill(9, 4, 10, 5, clr::kFill);
+    c.Fill(4, 3, 11, 6, clr::kAccent());
+    c.Fill(9, 4, 10, 5, clr::kFill());
     // Two lines on the label.
-    c.HLine(4, 11, 9,  clr::kMute);
-    c.HLine(4, 11, 11, clr::kMute);
+    c.HLine(4, 11, 9,  clr::kMute());
+    c.HLine(4, 11, 11, clr::kMute());
 }
 void DrawSaveAll(IconCanvas& c) {
     // Back floppy outline.
-    c.Rect(5, 5, 14, 14, clr::kInk); c.Fill(6, 6, 13, 13, clr::kFill);
-    c.Fill(8, 6, 12, 8, clr::kAccent);
+    c.Rect(5, 5, 14, 14, clr::kInk()); c.Fill(6, 6, 13, 13, clr::kFill());
+    c.Fill(8, 6, 12, 8, clr::kAccent());
     // Front floppy.
-    c.Rect(1, 1, 10, 10, clr::kInk); c.Fill(2, 2, 9, 9, clr::kFill);
-    c.Fill(3, 2, 8, 4, clr::kAccent);
-    c.HLine(3, 7, 7, clr::kMute);
+    c.Rect(1, 1, 10, 10, clr::kInk()); c.Fill(2, 2, 9, 9, clr::kFill());
+    c.Fill(3, 2, 8, 4, clr::kAccent());
+    c.HLine(3, 7, 7, clr::kMute());
 }
 void DrawClose(IconCanvas& c) {
     DrawPageOutline(c);
     for (int i = 0; i < 5; ++i) {
-        c.Dot(5+i, 5+i, clr::kRed); c.Dot(6+i, 5+i, clr::kRed);
-        c.Dot(9-i, 5+i, clr::kRed); c.Dot(10-i, 5+i, clr::kRed);
+        c.Dot(5+i, 5+i, clr::kRed()); c.Dot(6+i, 5+i, clr::kRed());
+        c.Dot(9-i, 5+i, clr::kRed()); c.Dot(10-i, 5+i, clr::kRed());
     }
 }
 void DrawCloseAll(IconCanvas& c) {
     // Back page suggestion.
-    c.Rect(1, 0, 7, 4, clr::kInk);
+    c.Rect(1, 0, 7, 4, clr::kInk());
     DrawPageOutline(c);
     for (int i = 0; i < 5; ++i) {
-        c.Dot(5+i, 7+i, clr::kRed); c.Dot(6+i, 7+i, clr::kRed);
-        c.Dot(9-i, 7+i, clr::kRed); c.Dot(10-i, 7+i, clr::kRed);
+        c.Dot(5+i, 7+i, clr::kRed()); c.Dot(6+i, 7+i, clr::kRed());
+        c.Dot(9-i, 7+i, clr::kRed()); c.Dot(10-i, 7+i, clr::kRed());
     }
 }
 void DrawCut(IconCanvas& c) {
     // Two crossing blades in ink.
     for (int i = 0; i < 7; ++i) {
-        c.Dot(3 + i, 2 + i, clr::kInk); c.Dot(4 + i, 2 + i, clr::kInk);
-        c.Dot(12 - i, 2 + i, clr::kInk); c.Dot(11 - i, 2 + i, clr::kInk);
+        c.Dot(3 + i, 2 + i, clr::kInk()); c.Dot(4 + i, 2 + i, clr::kInk());
+        c.Dot(12 - i, 2 + i, clr::kInk()); c.Dot(11 - i, 2 + i, clr::kInk());
     }
     // Two ring handles in accent (outline only).
-    c.Rect(1, 10, 6, 15, clr::kAccent); c.Rect(2, 11, 5, 14, clr::kAccent);
-    c.Rect(9, 10, 14, 15, clr::kAccent); c.Rect(10, 11, 13, 14, clr::kAccent);
+    c.Rect(1, 10, 6, 15, clr::kAccent()); c.Rect(2, 11, 5, 14, clr::kAccent());
+    c.Rect(9, 10, 14, 15, clr::kAccent()); c.Rect(10, 11, 13, 14, clr::kAccent());
 }
 void DrawCopy(IconCanvas& c) {
     // Two outline pages, front white, back lightly accented.
-    c.Rect(5, 4, 13, 14, clr::kInk);
-    c.Fill(6, 5, 12, 13, clr::kFill);
-    c.Rect(2, 1, 10, 11, clr::kInk);
-    c.Fill(3, 2, 9, 10, clr::kFill);
-    c.HLine(4, 8, 4, clr::kAccent);
-    c.HLine(4, 8, 6, clr::kMute);
-    c.HLine(4, 8, 8, clr::kMute);
+    c.Rect(5, 4, 13, 14, clr::kInk());
+    c.Fill(6, 5, 12, 13, clr::kFill());
+    c.Rect(2, 1, 10, 11, clr::kInk());
+    c.Fill(3, 2, 9, 10, clr::kFill());
+    c.HLine(4, 8, 4, clr::kAccent());
+    c.HLine(4, 8, 6, clr::kMute());
+    c.HLine(4, 8, 8, clr::kMute());
 }
 void DrawPaste(IconCanvas& c) {
     // Clipboard outline; accent clip at top.
-    c.Rect(2, 3, 13, 14, clr::kInk);
-    c.Fill(3, 4, 12, 13, clr::kFill);
-    c.Fill(6, 1, 9, 4, clr::kAccent);
-    c.Rect(6, 1, 9, 4, clr::kInk);
-    c.HLine(5, 10, 7, clr::kMute);
-    c.HLine(5, 10, 9, clr::kMute);
-    c.HLine(5, 10, 11, clr::kMute);
+    c.Rect(2, 3, 13, 14, clr::kInk());
+    c.Fill(3, 4, 12, 13, clr::kFill());
+    c.Fill(6, 1, 9, 4, clr::kAccent());
+    c.Rect(6, 1, 9, 4, clr::kInk());
+    c.HLine(5, 10, 7, clr::kMute());
+    c.HLine(5, 10, 9, clr::kMute());
+    c.HLine(5, 10, 11, clr::kMute());
 }
 void DrawArrow(IconCanvas& c, bool right)
 {
@@ -1062,13 +1071,13 @@ void DrawArrow(IconCanvas& c, bool right)
         double rad = t * 3.14159 / 180;
         int x = 8 + (int)(5.0 * std::cos(rad));
         int y = 8 + (int)(5.0 * std::sin(rad));
-        c.Dot(x, y, clr::kAccent); c.Dot(x, y + 1, clr::kAccent);
+        c.Dot(x, y, clr::kAccent()); c.Dot(x, y + 1, clr::kAccent());
     }
     int hx = right ? 12 : 4;
-    c.Fill(hx - 1, 6, hx + 1, 8, clr::kAccent);
-    c.Dot(hx - 2, 7, clr::kAccent); c.Dot(hx + 2, 7, clr::kAccent);
-    c.Dot(hx - 1, 5, clr::kAccent); c.Dot(hx + 1, 5, clr::kAccent);
-    c.Dot(hx - 1, 9, clr::kAccent); c.Dot(hx + 1, 9, clr::kAccent);
+    c.Fill(hx - 1, 6, hx + 1, 8, clr::kAccent());
+    c.Dot(hx - 2, 7, clr::kAccent()); c.Dot(hx + 2, 7, clr::kAccent());
+    c.Dot(hx - 1, 5, clr::kAccent()); c.Dot(hx + 1, 5, clr::kAccent());
+    c.Dot(hx - 1, 9, clr::kAccent()); c.Dot(hx + 1, 9, clr::kAccent());
 }
 void DrawUndo(IconCanvas& c) { DrawArrow(c, false); }
 void DrawRedo(IconCanvas& c) { DrawArrow(c, true); }
@@ -1078,58 +1087,58 @@ void DrawFind(IconCanvas& c) {
     for (int y = cy - r; y <= cy + r; ++y)
         for (int x = cx - r; x <= cx + r; ++x) {
             int d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
-            if (d >= (r - 1) * (r - 1) && d <= r * r) c.Dot(x, y, clr::kInk);
+            if (d >= (r - 1) * (r - 1) && d <= r * r) c.Dot(x, y, clr::kInk());
         }
     // Handle in accent.
     for (int i = 0; i < 5; ++i) {
-        c.Dot(10 + i, 10 + i, clr::kAccent);
-        c.Dot(11 + i, 10 + i, clr::kAccent);
-        c.Dot(10 + i, 11 + i, clr::kAccent);
+        c.Dot(10 + i, 10 + i, clr::kAccent());
+        c.Dot(11 + i, 10 + i, clr::kAccent());
+        c.Dot(10 + i, 11 + i, clr::kAccent());
     }
 }
 void DrawReplace(IconCanvas& c) {
     DrawFind(c);
     // Small accent arrow inside lens.
-    c.HLine(4, 7, 6, clr::kAccent);
-    c.Dot(7, 5, clr::kAccent); c.Dot(8, 6, clr::kAccent); c.Dot(7, 7, clr::kAccent);
+    c.HLine(4, 7, 6, clr::kAccent());
+    c.Dot(7, 5, clr::kAccent()); c.Dot(8, 6, clr::kAccent()); c.Dot(7, 7, clr::kAccent());
 }
 void DrawFindFiles(IconCanvas& c) {
     // Outline folder behind, then magnifier on top.
-    c.Rect(0, 7, 10, 14, clr::kInk);
-    c.Fill(1, 8, 9, 13, clr::kFill);
-    c.HLine(0, 5, 6, clr::kInk);
+    c.Rect(0, 7, 10, 14, clr::kInk());
+    c.Fill(1, 8, 9, 13, clr::kFill());
+    c.HLine(0, 5, 6, clr::kInk());
     DrawFind(c);
 }
 void DrawBookmark(IconCanvas& c) {
     // Outline ribbon, accent fill.
-    c.Rect(4, 1, 11, 13, clr::kInk);
-    c.Fill(5, 2, 10, 12, clr::kAccent);
+    c.Rect(4, 1, 11, 13, clr::kInk());
+    c.Fill(5, 2, 10, 12, clr::kAccent());
     // V notch.
     c.Dot(7, 13, 0); c.Dot(8, 13, 0);
     for (int y = 10; y <= 12; ++y) {
         int span = 12 - y;
         for (int x = 5 + (12 - y); x <= 10 - (12 - y); ++x) {
             if (x >= 5 + (12 - y) && x <= 10 - (12 - y))
-                c.Dot(x, y, clr::kFill);
+                c.Dot(x, y, clr::kFill());
         }
     }
 }
 void DrawSplit(IconCanvas& c) {
-    c.Rect(1, 2, 14, 13, clr::kInk);
-    c.Fill(2, 3, 13, 12, clr::kFill);
-    c.VLine(7, 2, 13, clr::kInk); c.VLine(8, 2, 13, clr::kInk);
+    c.Rect(1, 2, 14, 13, clr::kInk());
+    c.Fill(2, 3, 13, 12, clr::kFill());
+    c.VLine(7, 2, 13, clr::kInk()); c.VLine(8, 2, 13, clr::kInk());
     // Accent stripe across both panes top.
-    c.HLine(2, 6, 3, clr::kAccent);
-    c.HLine(9, 13, 3, clr::kAccent);
+    c.HLine(2, 6, 3, clr::kAccent());
+    c.HLine(9, 13, 3, clr::kAccent());
 }
 void DrawBinary(IconCanvas& c) {
     // "10" in accent — two simple glyphs.
-    c.VLine(3, 2, 7, clr::kInk); c.VLine(4, 2, 7, clr::kInk);
-    c.Dot(2, 3, clr::kInk);
-    c.Rect(6, 2, 9, 7, clr::kInk);
-    c.Rect(2, 8, 5, 13, clr::kInk);
-    c.VLine(8, 8, 13, clr::kAccent); c.VLine(9, 8, 13, clr::kAccent);
-    c.Dot(7, 9, clr::kAccent);
+    c.VLine(3, 2, 7, clr::kInk()); c.VLine(4, 2, 7, clr::kInk());
+    c.Dot(2, 3, clr::kInk());
+    c.Rect(6, 2, 9, 7, clr::kInk());
+    c.Rect(2, 8, 5, 13, clr::kInk());
+    c.VLine(8, 8, 13, clr::kAccent()); c.VLine(9, 8, 13, clr::kAccent());
+    c.Dot(7, 9, clr::kAccent());
 }
 
 using Drawer = void(*)(IconCanvas&);
@@ -1175,7 +1184,6 @@ void Notepad_plus_Window::CreateToolbar()
         { nullptr,       0,                       nullptr },
         { DrawBookmark,  IDM_SEARCH_BMK_TOGGLE,   L"Toggle Bookmark" },
         { nullptr,       0,                       nullptr },
-        { DrawSplit,     IDM_VIEW_TOGGLE_SPLIT,   L"Toggle Split View" },
         { DrawBinary,    IDM_EDIT_BINARY_MODE,    L"Binary Mode" },
     };
 
@@ -1255,7 +1263,6 @@ void Notepad_plus_Window::RebuildToolbar()
         { nullptr,       0,                       nullptr },
         { DrawBookmark,  IDM_SEARCH_BMK_TOGGLE,   L"Toggle Bookmark" },
         { nullptr,       0,                       nullptr },
-        { DrawSplit,     IDM_VIEW_TOGGLE_SPLIT,   L"Toggle Split View" },
         { DrawBinary,    IDM_EDIT_BINARY_MODE,    L"Binary Mode" },
     };
 
@@ -1290,20 +1297,11 @@ void Notepad_plus_Window::RebuildToolbar()
     ::InvalidateRect(toolbar_, nullptr, TRUE);
 }
 
-void Notepad_plus_Window::ToggleDarkMode()
+void Notepad_plus_Window::ApplyCurrentTheme()
 {
-    Parameters& p = Parameters::Instance();
-    bool newDark = !p.DarkMode();
-    p.SetDarkMode(newDark);
-    p.Save();
-
-    // Apply to title bar + frame chrome
-    ApplyDarkToFrame(hwnd_, statusBar_, toolbar_, newDark);
-
-    // Rebuild toolbar icons with new background
+    ApplyFrameTheme(hwnd_, statusBar_, toolbar_);
     RebuildToolbar();
 
-    // Re-apply syntax styles to all open editors
     for (int v = 0; v < 2; ++v) {
         if (!app_.V(v).editor.Hwnd()) continue;
         BufferID bid = app_.V(v).activeId;
@@ -1311,8 +1309,6 @@ void Notepad_plus_Window::ToggleDarkMode()
         const Buffer* buf = BufferManager::Instance().Get(bid);
         if (buf) ApplyLanguage(app_.V(v).editor, buf->GetLang());
     }
-
-    // Repaint tabs
     for (int v = 0; v < 2; ++v) {
         if (app_.V(v).tabs.Hwnd())
             ::InvalidateRect(app_.V(v).tabs.Hwnd(), nullptr, TRUE);
@@ -1320,6 +1316,22 @@ void Notepad_plus_Window::ToggleDarkMode()
 
     UpdateCheckedMenus();
     OnSize(hwnd_);
+}
+
+void Notepad_plus_Window::SetTheme(ThemeId t)
+{
+    Parameters& p = Parameters::Instance();
+    if (p.Theme() == t) return;
+    p.SetTheme(t);
+    p.Save();
+    ApplyCurrentTheme();
+}
+
+void Notepad_plus_Window::CycleTheme()
+{
+    Parameters& p = Parameters::Instance();
+    int next = (static_cast<int>(p.Theme()) + 1) % static_cast<int>(ThemeId::Count_);
+    SetTheme(static_cast<ThemeId>(next));
 }
 
 LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
@@ -1489,11 +1501,6 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
                 if (app_.Dock().IsShown(DockSide::Right) &&
                     app_.Dock().Panel(DockSide::Right) == &app_.DocMapPane()) {
                     app_.RefreshDocMapViewport();
-                }
-                if (app_.Compare().IsActive() && app_.IsSplit()) {
-                    int other = 1 - editorView;
-                    app_.Compare().OnScroll(app_.V(editorView).editor,
-                                            app_.V(other).editor);
                 }
                 if (scn->updated & SC_UPDATE_SELECTION) {
                     ScintillaEditView& ved = app_.V(editorView).editor;
@@ -1684,24 +1691,16 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
         case IDM_VIEW_FIND_RESULTS:
             app_.ToggleDock(DockSide::Bottom);
             break;
-        case IDM_VIEW_TOGGLE_SPLIT:
-            app_.ToggleSplit(h, hInst_);
-            WireTabContextForView(1);
-            if (app_.IsSplit())
-                InstallEditorCtxHook(app_.V(1).editor.Hwnd(), &app_, hwnd_);
-            break;
         case IDM_VIEW_DARKMODE:
-            ToggleDarkMode();
+            CycleTheme();
             break;
-        case IDM_VIEW_MOVE_TO_OTHER:
-            app_.MoveActiveTabToOtherView();
-            break;
-        case IDM_VIEW_CLONE_TO_OTHER:
-            app_.CloneActiveTabToOtherView();
-            break;
-
-        case IDM_TOOL_COMPARE:
-            app_.ToggleCompare();
+        case IDM_VIEW_THEME_LIGHT:
+        case IDM_VIEW_THEME_DARK:
+        case IDM_VIEW_THEME_HIGHCONTRAST:
+        case IDM_VIEW_THEME_MINT:
+        case IDM_VIEW_THEME_NORDIC:
+        case IDM_VIEW_THEME_DEEPBLUE:
+            SetTheme(static_cast<ThemeId>(LOWORD(w) - IDM_VIEW_THEME_BASE));
             break;
         case IDM_EDIT_COL_EDITOR:
             ShowColumnEditorDialog();
@@ -1737,9 +1736,20 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
                 app_.UpdateTitle(hwnd_);
             }
             break;
-        case IDM_TOOL_COMPARE_CLEAR:
-            if (app_.IsSplit())
-                app_.Compare().Clear(app_.V(0).editor, app_.V(1).editor);
+        case IDM_TOOL_COMPARE_TEXT:
+            ShowTextComparePicker();
+            break;
+        case IDM_TOOL_COMPARE_HEX:
+            ShowHexComparePicker();
+            break;
+        case IDM_TOOL_COMPARE_FOLDER:
+            FolderCompareWindow::Open(hwnd_, hInst_);
+            break;
+        case IDM_TOOL_COMPARE_NEXT_DIFF:
+            TextCompareWindow::NextDiffActive();
+            break;
+        case IDM_TOOL_COMPARE_PREV_DIFF:
+            TextCompareWindow::PreviousDiffActive();
             break;
         case IDM_VIEW_FOLDER_OPEN: {
             BROWSEINFOW bi{};
@@ -1853,6 +1863,172 @@ void Notepad_plus_Window::ShowColumnEditorDialog()
     ::DialogBoxParamW(hInst_, MAKEINTRESOURCEW(IDD_COL_EDITOR),
         hwnd_, ColEditDlgProc, reinterpret_cast<LPARAM>(&st));
     if (st.ok) app_.ColumnEdit(st.p);
+}
+
+// ---- Text Compare picker ----------------------------------------------------
+
+namespace {
+
+struct TxCmpPickState {
+    std::wstring left;
+    std::wstring right;
+    bool ignoreWS   = false;
+    bool ignoreCase = false;
+    bool ok = false;
+};
+
+// Shared by the text and hex pickers — both use the same file-path + Browse
+// layout, so a common helper keeps behavior identical.
+void BrowseInto(HWND parent, HWND edit)
+{
+    wchar_t path[MAX_PATH] = {0};
+    ::GetWindowTextW(edit, path, MAX_PATH);
+    OPENFILENAMEW ofn{ sizeof(ofn) };
+    ofn.hwndOwner = parent;
+    ofn.lpstrFile = path;
+    ofn.nMaxFile  = MAX_PATH;
+    ofn.lpstrFilter = L"All Files\0*.*\0";
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+    if (::GetOpenFileNameW(&ofn)) {
+        ::SetWindowTextW(edit, path);
+    }
+}
+
+INT_PTR CALLBACK TxCmpDlgProc(HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    TxCmpPickState* st = reinterpret_cast<TxCmpPickState*>(
+        ::GetWindowLongPtrW(h, GWLP_USERDATA));
+    switch (m) {
+    case WM_INITDIALOG: {
+        ::SetWindowLongPtrW(h, GWLP_USERDATA, l);
+        auto* s = reinterpret_cast<TxCmpPickState*>(l);
+        ::SetDlgItemTextW(h, IDC_TXCMP_LEFT_PATH,  s->left.c_str());
+        ::SetDlgItemTextW(h, IDC_TXCMP_RIGHT_PATH, s->right.c_str());
+        return TRUE;
+    }
+    case WM_COMMAND: {
+        WORD id = LOWORD(w);
+        if (id == IDC_TXCMP_LEFT_BROWSE)  { BrowseInto(h, ::GetDlgItem(h, IDC_TXCMP_LEFT_PATH));  return TRUE; }
+        if (id == IDC_TXCMP_RIGHT_BROWSE) { BrowseInto(h, ::GetDlgItem(h, IDC_TXCMP_RIGHT_PATH)); return TRUE; }
+        if (id == IDOK) {
+            wchar_t L[MAX_PATH], R[MAX_PATH];
+            ::GetDlgItemTextW(h, IDC_TXCMP_LEFT_PATH,  L, MAX_PATH);
+            ::GetDlgItemTextW(h, IDC_TXCMP_RIGHT_PATH, R, MAX_PATH);
+            if (!*L || !*R) {
+                ::MessageBoxW(h, L"Pick a file for both sides.", L"Compare Text", MB_OK | MB_ICONINFORMATION);
+                return TRUE;
+            }
+            st->left = L; st->right = R;
+            st->ignoreWS   = ::SendMessageW(::GetDlgItem(h, IDC_TXCMP_IGNORE_WS),   BM_GETCHECK, 0, 0) == BST_CHECKED;
+            st->ignoreCase = ::SendMessageW(::GetDlgItem(h, IDC_TXCMP_IGNORE_CASE), BM_GETCHECK, 0, 0) == BST_CHECKED;
+            st->ok = true;
+            ::EndDialog(h, IDOK);
+            return TRUE;
+        }
+        if (id == IDCANCEL) { ::EndDialog(h, IDCANCEL); return TRUE; }
+        return FALSE;
+    }
+    }
+    return FALSE;
+}
+
+}  // namespace
+
+void Notepad_plus_Window::ShowTextComparePicker()
+{
+    TxCmpPickState st;
+    auto& params = Parameters::Instance();
+    st.left  = params.cmpTextLeft;
+    st.right = params.cmpTextRight;
+    INT_PTR r = ::DialogBoxParamW(hInst_, MAKEINTRESOURCEW(IDD_TEXT_COMPARE_PICK),
+        hwnd_, TxCmpDlgProc, reinterpret_cast<LPARAM>(&st));
+    if (r != IDOK || !st.ok) return;
+    params.cmpTextLeft  = st.left;
+    params.cmpTextRight = st.right;
+    params.Save();
+
+    std::vector<char> lbytes, rbytes;
+    if (!ReadFileAll(st.left, lbytes)) {
+        ::MessageBoxW(hwnd_, (L"Cannot read:\n" + st.left).c_str(),
+            L"Compare Text", MB_OK | MB_ICONERROR);
+        return;
+    }
+    if (!ReadFileAll(st.right, rbytes)) {
+        ::MessageBoxW(hwnd_, (L"Cannot read:\n" + st.right).c_str(),
+            L"Compare Text", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    auto fileName = [](const std::wstring& p) -> std::wstring {
+        size_t slash = p.find_last_of(L"\\/");
+        return slash == std::wstring::npos ? p : p.substr(slash + 1);
+    };
+
+    LineDiffOptions opt{ st.ignoreWS, st.ignoreCase };
+    TextCompareWindow::Open(hwnd_, hInst_,
+        fileName(st.left),  std::string(lbytes.begin(), lbytes.end()),
+        fileName(st.right), std::string(rbytes.begin(), rbytes.end()), opt);
+}
+
+// ---- Hex Compare picker -----------------------------------------------------
+
+namespace {
+
+struct HexCmpState {
+    std::wstring left;
+    std::wstring right;
+    bool ok = false;
+};
+
+INT_PTR CALLBACK HexCmpDlgProc(HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    HexCmpState* st = reinterpret_cast<HexCmpState*>(::GetWindowLongPtrW(h, GWLP_USERDATA));
+    switch (m) {
+    case WM_INITDIALOG: {
+        ::SetWindowLongPtrW(h, GWLP_USERDATA, l);
+        auto* s = reinterpret_cast<HexCmpState*>(l);
+        ::SetDlgItemTextW(h, IDC_HEXCMP_LEFT_PATH,  s->left.c_str());
+        ::SetDlgItemTextW(h, IDC_HEXCMP_RIGHT_PATH, s->right.c_str());
+        return TRUE;
+    }
+    case WM_COMMAND: {
+        WORD id = LOWORD(w);
+        if (id == IDC_HEXCMP_LEFT_BROWSE)  { BrowseInto(h, ::GetDlgItem(h, IDC_HEXCMP_LEFT_PATH));  return TRUE; }
+        if (id == IDC_HEXCMP_RIGHT_BROWSE) { BrowseInto(h, ::GetDlgItem(h, IDC_HEXCMP_RIGHT_PATH)); return TRUE; }
+        if (id == IDOK) {
+            wchar_t L[MAX_PATH], R[MAX_PATH];
+            ::GetDlgItemTextW(h, IDC_HEXCMP_LEFT_PATH,  L, MAX_PATH);
+            ::GetDlgItemTextW(h, IDC_HEXCMP_RIGHT_PATH, R, MAX_PATH);
+            if (!*L || !*R) {
+                ::MessageBoxW(h, L"Pick a file for both sides.", L"Compare Hex", MB_OK | MB_ICONINFORMATION);
+                return TRUE;
+            }
+            st->left = L; st->right = R; st->ok = true;
+            ::EndDialog(h, IDOK);
+            return TRUE;
+        }
+        if (id == IDCANCEL) { ::EndDialog(h, IDCANCEL); return TRUE; }
+        return FALSE;
+    }
+    }
+    return FALSE;
+}
+
+}  // namespace
+
+void Notepad_plus_Window::ShowHexComparePicker()
+{
+    HexCmpState st;
+    auto& params = Parameters::Instance();
+    st.left  = params.cmpHexLeft;
+    st.right = params.cmpHexRight;
+    INT_PTR r = ::DialogBoxParamW(hInst_, MAKEINTRESOURCEW(IDD_HEX_COMPARE),
+        hwnd_, HexCmpDlgProc, reinterpret_cast<LPARAM>(&st));
+    if (r != IDOK || !st.ok) return;
+    params.cmpHexLeft  = st.left;
+    params.cmpHexRight = st.right;
+    params.Save();
+    HexCompareWindow::Open(hwnd_, hInst_, st.left, st.right);
 }
 
 void Notepad_plus_Window::WireTabContextForView(int v)

@@ -113,14 +113,45 @@
 #define IDC_FIF_SUBDIRS             2008
 #define IDC_FIF_FINDALL             2009
 
-// View — split / dual view
-#define IDM_VIEW_TOGGLE_SPLIT       40720
-#define IDM_VIEW_MOVE_TO_OTHER      40721
-#define IDM_VIEW_CLONE_TO_OTHER     40722
-
 // Tools — Compare
-#define IDM_TOOL_COMPARE            40880
-#define IDM_TOOL_COMPARE_CLEAR      40881
+#define IDM_TOOL_COMPARE_TEXT       40882   // Beyond-Compare-style text compare dialog
+#define IDM_TOOL_COMPARE_HEX        40883   // Hex compare
+#define IDM_TOOL_COMPARE_FOLDER     40884   // Folder compare
+#define IDM_TOOL_COMPARE_NEXT_DIFF  40885
+#define IDM_TOOL_COMPARE_PREV_DIFF  40886
+
+// Hex Compare dialog
+#define IDD_HEX_COMPARE             220
+#define IDC_HEXCMP_LEFT_PATH        2201
+#define IDC_HEXCMP_LEFT_BROWSE      2202
+#define IDC_HEXCMP_RIGHT_PATH       2203
+#define IDC_HEXCMP_RIGHT_BROWSE     2204
+#define IDC_HEXCMP_LEFT_VIEW        2205
+#define IDC_HEXCMP_RIGHT_VIEW       2206
+#define IDC_HEXCMP_STATUS           2207
+#define IDC_HEXCMP_NEXT             2208
+#define IDC_HEXCMP_PREV             2209
+
+// Folder Compare dialog
+#define IDD_FOLDER_COMPARE          221
+#define IDC_FCMP_LEFT_PATH          2211
+#define IDC_FCMP_LEFT_BROWSE        2212
+#define IDC_FCMP_RIGHT_PATH         2213
+#define IDC_FCMP_RIGHT_BROWSE       2214
+#define IDC_FCMP_RECURSIVE          2215
+#define IDC_FCMP_FILTERS            2216
+#define IDC_FCMP_COMPARE_BTN        2217
+#define IDC_FCMP_LIST               2218
+#define IDC_FCMP_STATUS             2219
+
+// Text Compare picker dialog (pick two files from disk)
+#define IDD_TEXT_COMPARE_PICK       222
+#define IDC_TXCMP_LEFT_PATH         2221
+#define IDC_TXCMP_LEFT_BROWSE       2222
+#define IDC_TXCMP_RIGHT_PATH        2223
+#define IDC_TXCMP_RIGHT_BROWSE      2224
+#define IDC_TXCMP_IGNORE_WS         2225
+#define IDC_TXCMP_IGNORE_CASE       2226
 
 // Column Editor dialog
 #define IDD_COL_EDITOR              212
@@ -138,6 +169,15 @@
 
 // Settings
 #define IDM_VIEW_DARKMODE           40800
+// Theme picker: View → Theme → (6 items). Keep contiguous so we can check-radio them.
+#define IDM_VIEW_THEME_BASE         40810
+#define IDM_VIEW_THEME_LIGHT        40810  // ModernLight
+#define IDM_VIEW_THEME_DARK         40811  // DarkPro
+#define IDM_VIEW_THEME_HIGHCONTRAST 40812
+#define IDM_VIEW_THEME_MINT         40813
+#define IDM_VIEW_THEME_NORDIC       40814
+#define IDM_VIEW_THEME_DEEPBLUE     40815
+#define IDM_VIEW_THEME_LAST         40815
 
 // Help
 #define IDM_HELP_ABOUT              40901

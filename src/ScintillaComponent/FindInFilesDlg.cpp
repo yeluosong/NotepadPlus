@@ -16,7 +16,7 @@ namespace {
 INT_PTR HandleThemedCtlColor(UINT m, WPARAM w, LPARAM l)
 {
     if (!Parameters::Instance().DarkMode()) return 0;
-    const UiPalette& u = Ui(true);
+    const UiPalette& u = Ui();
     HDC hdc = reinterpret_cast<HDC>(w);
     ::SetTextColor(hdc, u.text);
     bool isEdit = (m == WM_CTLCOLOREDIT || m == WM_CTLCOLORLISTBOX);

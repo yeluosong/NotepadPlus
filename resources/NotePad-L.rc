@@ -96,11 +96,16 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Find &Results",                  IDM_VIEW_FIND_RESULTS
         MENUITEM SEPARATOR
-        MENUITEM "&Split View\tF8",                IDM_VIEW_TOGGLE_SPLIT
-        MENUITEM "Move Current Tab to Other View", IDM_VIEW_MOVE_TO_OTHER
-        MENUITEM "Clone Current Tab to Other View",IDM_VIEW_CLONE_TO_OTHER
-        MENUITEM SEPARATOR
-        MENUITEM "&Dark Mode\tCtrl+Alt+D",         IDM_VIEW_DARKMODE
+        POPUP "&Theme"
+        BEGIN
+            MENUITEM "&Modern Light",               IDM_VIEW_THEME_LIGHT
+            MENUITEM "&Dark Pro",                   IDM_VIEW_THEME_DARK
+            MENUITEM "&High Contrast",              IDM_VIEW_THEME_HIGHCONTRAST
+            MENUITEM "Soft &Mint (Eye Care)",       IDM_VIEW_THEME_MINT
+            MENUITEM "&Nordic",                     IDM_VIEW_THEME_NORDIC
+            MENUITEM "Deep &Blue",                  IDM_VIEW_THEME_DEEPBLUE
+        END
+        MENUITEM "Cycle &Theme\tCtrl+Alt+D",       IDM_VIEW_DARKMODE
     END
     POPUP "&Encoding"
     BEGIN
@@ -131,8 +136,12 @@ BEGIN
     END
     POPUP "&Tools"
     BEGIN
-        MENUITEM "&Compare with Other View\tCtrl+Alt+C", IDM_TOOL_COMPARE
-        MENUITEM "Clear Compare",                        IDM_TOOL_COMPARE_CLEAR
+        MENUITEM "Compare &Text...",                     IDM_TOOL_COMPARE_TEXT
+        MENUITEM "Compare as &Hex...",                   IDM_TOOL_COMPARE_HEX
+        MENUITEM "Compare &Folders...",                  IDM_TOOL_COMPARE_FOLDER
+        MENUITEM SEPARATOR
+        MENUITEM "&Next Difference\tF7",                 IDM_TOOL_COMPARE_NEXT_DIFF
+        MENUITEM "&Previous Difference\tShift+F7",       IDM_TOOL_COMPARE_PREV_DIFF
     END
     POPUP "&?"
     BEGIN
@@ -174,8 +183,8 @@ BEGIN
     VK_TAB,    IDM_WIN_PREV,   VIRTKEY, CONTROL, SHIFT
     VK_NEXT,   IDM_WIN_NEXT,   VIRTKEY, CONTROL
     VK_PRIOR,  IDM_WIN_PREV,   VIRTKEY, CONTROL
-    VK_F8,     IDM_VIEW_TOGGLE_SPLIT, VIRTKEY
-    "C",       IDM_TOOL_COMPARE,      VIRTKEY, CONTROL, ALT
+    VK_F7,     IDM_TOOL_COMPARE_NEXT_DIFF, VIRTKEY
+    VK_F7,     IDM_TOOL_COMPARE_PREV_DIFF, VIRTKEY, SHIFT
     "C",       IDM_EDIT_COL_EDITOR,   VIRTKEY, ALT
     "C",       IDM_EDIT_COLUMN_MODE,  VIRTKEY, ALT, SHIFT
     "B",       IDM_EDIT_BINARY_MODE,  VIRTKEY, CONTROL, ALT
@@ -247,6 +256,38 @@ BEGIN
 
     DEFPUSHBUTTON   "OK",     IDOK,     130, 204, 64, 18
     PUSHBUTTON      "Cancel", IDCANCEL, 202, 204, 64, 18
+END
+
+IDD_HEX_COMPARE DIALOGEX 0, 0, 320, 90
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Compare Files as Hex"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT       "&Left file:",   -1,                   10, 12, 60, 9
+    EDITTEXT                     IDC_HEXCMP_LEFT_PATH, 72, 10, 214, 13, ES_AUTOHSCROLL
+    PUSHBUTTON  "...",           IDC_HEXCMP_LEFT_BROWSE, 290, 10, 20, 13
+    LTEXT       "&Right file:",  -1,                   10, 32, 60, 9
+    EDITTEXT                     IDC_HEXCMP_RIGHT_PATH, 72, 30, 214, 13, ES_AUTOHSCROLL
+    PUSHBUTTON  "...",           IDC_HEXCMP_RIGHT_BROWSE, 290, 30, 20, 13
+    DEFPUSHBUTTON "Compare",     IDOK,     194, 64, 54, 16
+    PUSHBUTTON   "Cancel",       IDCANCEL, 254, 64, 54, 16
+END
+
+IDD_TEXT_COMPARE_PICK DIALOGEX 0, 0, 320, 110
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Compare Text"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT       "&Left file:",   -1,                    10, 12, 60, 9
+    EDITTEXT                     IDC_TXCMP_LEFT_PATH,   72, 10, 214, 13, ES_AUTOHSCROLL
+    PUSHBUTTON  "...",           IDC_TXCMP_LEFT_BROWSE, 290, 10, 20, 13
+    LTEXT       "&Right file:",  -1,                    10, 32, 60, 9
+    EDITTEXT                     IDC_TXCMP_RIGHT_PATH,  72, 30, 214, 13, ES_AUTOHSCROLL
+    PUSHBUTTON  "...",           IDC_TXCMP_RIGHT_BROWSE, 290, 30, 20, 13
+    AUTOCHECKBOX "Ignore &whitespace",  IDC_TXCMP_IGNORE_WS,   10, 54, 130, 11
+    AUTOCHECKBOX "Ignore &case",        IDC_TXCMP_IGNORE_CASE, 10, 68, 130, 11
+    DEFPUSHBUTTON "Compare",            IDOK,                 194, 84, 54, 16
+    PUSHBUTTON    "Cancel",             IDCANCEL,             254, 84, 54, 16
 END
 
 VS_VERSION_INFO VERSIONINFO

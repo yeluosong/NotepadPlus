@@ -27,11 +27,13 @@ bool DocTabView::Create(HWND parent, HINSTANCE hInst, int ctrlId)
 
     // Modern UI font.
     LOGFONTW lf{};
-    lf.lfHeight = -13;
+    lf.lfHeight = -12;
     lf.lfWeight = FW_NORMAL;
     lf.lfCharSet = DEFAULT_CHARSET;
     lf.lfQuality = CLEARTYPE_QUALITY;
-    wcscpy_s(lf.lfFaceName, L"Segoe UI");
+    // Microsoft YaHei UI carries both Latin and CJK glyphs at consistent
+    // sizes, avoiding the oversized CJK fallback Segoe UI triggers.
+    wcscpy_s(lf.lfFaceName, L"Microsoft YaHei UI");
     HFONT font = ::CreateFontIndirectW(&lf);
     if (!font) font = reinterpret_cast<HFONT>(::GetStockObject(DEFAULT_GUI_FONT));
     ::SendMessageW(hwnd_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
@@ -199,8 +201,7 @@ BOOL DocTabView::HandleDrawItem(DRAWITEMSTRUCT* dis)
 
     const bool active = (dis->itemState & ODS_SELECTED) != 0;
     const bool hover  = (idx == hoverIndex_);
-    const bool isDark = Parameters::Instance().DarkMode();
-    const UiPalette& u = Ui(isDark);
+    const UiPalette& u = Ui();
     // Active tab = editor bg (so it visually connects to editor below).
     // Inactive = chrome bg. Hovered inactive gets a subtle lift.
     const COLORREF bg = active ? u.editorBg

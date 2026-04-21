@@ -146,45 +146,13 @@ void Notepad_plus::Layout(const RECT& client, int statusBarHeight)
     RECT center{};
     dock_.Layout(avail, center);
 
-    if (!splitEnabled_) {
-        RECT tabRc = center;
-        tabRc.bottom = tabRc.top + kTabBarHeight;
-        views_[0].tabs.Resize(tabRc);
+    RECT tabRc = center;
+    tabRc.bottom = tabRc.top + kTabBarHeight;
+    views_[0].tabs.Resize(tabRc);
 
-        RECT editorRc = center;
-        editorRc.top = tabRc.bottom;
-        views_[0].editor.Resize(editorRc);
-        if (splitter_) ::ShowWindow(splitter_, SW_HIDE);
-        if (views_[1].tabs.Hwnd())   ::ShowWindow(views_[1].tabs.Hwnd(),   SW_HIDE);
-        if (views_[1].editor.Hwnd()) ::ShowWindow(views_[1].editor.Hwnd(), SW_HIDE);
-        return;
-    }
-
-    const int splitW = 4;
-    int totalW = center.right - center.left;
-    int leftW  = (totalW - splitW) * splitRatio_ / 100;
-    if (leftW < 80) leftW = 80;
-    if (leftW > totalW - splitW - 80) leftW = totalW - splitW - 80;
-
-    RECT left = { center.left,             center.top, center.left + leftW,        center.bottom };
-    RECT bar  = { left.right,              center.top, left.right + splitW,        center.bottom };
-    RECT right= { bar.right,               center.top, center.right,               center.bottom };
-
-    auto laySlot = [&](int idx, const RECT& r){
-        RECT tabRc = r; tabRc.bottom = tabRc.top + kTabBarHeight;
-        views_[idx].tabs.Resize(tabRc);
-        RECT eRc = r; eRc.top = tabRc.bottom;
-        views_[idx].editor.Resize(eRc);
-        if (views_[idx].tabs.Hwnd())   ::ShowWindow(views_[idx].tabs.Hwnd(),   SW_SHOW);
-        if (views_[idx].editor.Hwnd()) ::ShowWindow(views_[idx].editor.Hwnd(), SW_SHOW);
-    };
-    laySlot(0, left);
-    laySlot(1, right);
-    if (splitter_) {
-        ::SetWindowPos(splitter_, nullptr, bar.left, bar.top,
-            bar.right - bar.left, bar.bottom - bar.top,
-            SWP_NOZORDER | SWP_SHOWWINDOW);
-    }
+    RECT editorRc = center;
+    editorRc.top = tabRc.bottom;
+    views_[0].editor.Resize(editorRc);
 }
 
 void Notepad_plus::UpdateTitle(HWND frame)
@@ -561,47 +529,6 @@ bool Notepad_plus::DoClose(HWND parent, BufferID id)
 
     // If that was the last tab in this view, make sure it isn't empty.
     if (V().tabs.TabCount() == 0) {
-        if (splitEnabled_) {
-            // Collapse split: surviving view becomes the only view.
-            int closedView = activeView_;
-            int keepView   = 1 - closedView;
-            HWND frame = ::GetParent(V().editor.Hwnd());
-
-            // Move all tabs from the surviving view into view 0 (if needed).
-            std::vector<BufferID> ids;
-            for (int i = 0, n = views_[keepView].tabs.TabCount(); i < n; ++i)
-                ids.push_back(views_[keepView].tabs.BufferAt(i));
-            BufferID survivorActive = views_[keepView].activeId;
-
-            // Clear both views' tab lists.
-            for (int v = 0; v < 2; ++v) {
-                while (views_[v].tabs.TabCount() > 0)
-                    views_[v].tabs.RemoveTab(views_[v].tabs.BufferAt(0));
-                views_[v].activeId = kInvalidBufferID;
-            }
-
-            splitEnabled_ = false;
-            activeView_   = 0;
-
-            for (BufferID rid : ids) {
-                Buffer* b = BufferManager::Instance().Get(rid);
-                if (!b) continue;
-                views_[0].tabs.AddTab(rid, b->DisplayName(),
-                    b->IsDirty(), rid == survivorActive);
-            }
-            if (views_[0].tabs.TabCount() == 0) {
-                DoNew();
-            } else {
-                views_[0].activeId = views_[0].tabs.ActiveBuffer();
-                if (Buffer* nb = BufferManager::Instance().Get(views_[0].activeId)) {
-                    views_[0].editor.AttachDocument(nb->DocHandle());
-                    RestoreViewState(views_[0].activeId);
-                }
-            }
-            (void)closedView;
-            ::SendMessageW(frame, WM_SIZE, 0, 0);
-            return true;
-        }
         DoNew();
     } else {
         V().activeId = V().tabs.ActiveBuffer();
@@ -1048,184 +975,10 @@ void Notepad_plus::RunFindInFiles(const FindInFilesParams& p)
     findResults_.SetSummary(buf);
 }
 
-// ---------------- M5: dual-view ----------------
-
-namespace {
-    constexpr wchar_t kSplitterCls[] = L"NotePadLVSplitter";
-
-    LRESULT CALLBACK SplitterProc(HWND h, UINT m, WPARAM w, LPARAM l)
-    {
-        static bool dragging = false;
-        switch (m) {
-        case WM_LBUTTONDOWN: dragging = true; ::SetCapture(h); return 0;
-        case WM_LBUTTONUP:   dragging = false; ::ReleaseCapture(); return 0;
-        case WM_MOUSEMOVE: {
-            if (!dragging) {
-                ::SetCursor(::LoadCursor(nullptr, IDC_SIZEWE));
-                return 0;
-            }
-            HWND parent = ::GetParent(h);
-            POINT pt{ LOWORD(l), HIWORD(l) };
-            ::ClientToScreen(h, &pt);
-            ::ScreenToClient(parent, &pt);
-            RECT pc; ::GetClientRect(parent, &pc);
-            int x = pt.x;
-            if (x < 80) x = 80;
-            if (x > pc.right - 80) x = pc.right - 80;
-            auto* app = reinterpret_cast<Notepad_plus*>(
-                ::GetWindowLongPtrW(h, GWLP_USERDATA));
-            if (app) app->SetSplitRatioFromX(x, pc.right);
-            return 0;
-        }
-        case WM_SETCURSOR:
-            ::SetCursor(::LoadCursor(nullptr, IDC_SIZEWE));
-            return TRUE;
-        case WM_ERASEBKGND: {
-            HDC dc = reinterpret_cast<HDC>(w);
-            RECT rc; ::GetClientRect(h, &rc);
-            HBRUSH br = ::GetSysColorBrush(COLOR_3DSHADOW);
-            ::FillRect(dc, &rc, br);
-            return 1;
-        }
-        }
-        return ::DefWindowProcW(h, m, w, l);
-    }
-
-    void EnsureSplitterClass(HINSTANCE hInst)
-    {
-        static bool registered = false;
-        if (registered) return;
-        WNDCLASSW wc{};
-        wc.lpfnWndProc   = SplitterProc;
-        wc.hInstance     = hInst;
-        wc.hCursor       = ::LoadCursor(nullptr, IDC_SIZEWE);
-        wc.lpszClassName = kSplitterCls;
-        ::RegisterClassW(&wc);
-        registered = true;
-    }
-}
-
-void Notepad_plus::SetSplitRatioFromX(int x, int totalW)
-{
-    if (totalW <= 0) return;
-    int r = x * 100 / totalW;
-    if (r < 10) r = 10;
-    if (r > 90) r = 90;
-    splitRatio_ = r;
-    HWND frame = ::GetParent(V().editor.Hwnd());
-    ::SendMessageW(frame, WM_SIZE, 0, 0);
-}
-
 void Notepad_plus::SetActiveView(int v)
 {
-    if (v < 0 || v > 1) return;
-    if (v == 1 && !splitEnabled_) return;
-    if (activeView_ == v) return;
-    activeView_ = v;
-    HWND frame = ::GetParent(views_[v].editor.Hwnd());
-    if (frame) {
-        UpdateTitle(frame);
-    }
-    Buffer* b = BufferManager::Instance().Get(views_[v].activeId);
-    if (b) {
-        if (dock_.IsShown(DockSide::Right)) {
-            DockPanel* p = dock_.Panel(DockSide::Right);
-            if (p == &docMap_) {
-                docMap_.AttachDoc(b->DocHandle());
-                RefreshDocMapViewport();
-            } else if (p == &funcList_) {
-                RefreshFunctionList();
-            }
-        }
-    }
-}
-
-void Notepad_plus::ToggleSplit(HWND parent, HINSTANCE hInst)
-{
-    if (!splitEnabled_) {
-        if (!views_[1].editor.Hwnd()) {
-            InitViewSlot(1, parent, hInst);
-            BufferManager::Instance().SetFactoryView(&views_[0].editor);
-        }
-        if (!splitter_) {
-            EnsureSplitterClass(hInst);
-            splitter_ = ::CreateWindowExW(0, kSplitterCls, L"",
-                WS_CHILD, 0, 0, 4, 4, parent, nullptr, hInst, nullptr);
-            ::SetWindowLongPtrW(splitter_, GWLP_USERDATA,
-                reinterpret_cast<LONG_PTR>(this));
-        }
-        splitEnabled_ = true;
-
-        // Seed view 1 with a fresh untitled buffer so it isn't blank.
-        if (views_[1].tabs.TabCount() == 0) {
-            int prev = activeView_;
-            activeView_ = 1;
-            DoNew();
-            activeView_ = prev;
-        }
-    } else {
-        // Move all view 1 tabs back to view 0, then hide.
-        std::vector<BufferID> ids;
-        for (int i = 0, n = views_[1].tabs.TabCount(); i < n; ++i)
-            ids.push_back(views_[1].tabs.BufferAt(i));
-        for (BufferID id : ids) {
-            views_[1].tabs.RemoveTab(id);
-            if (views_[0].tabs.IndexOf(id) < 0) {
-                Buffer* b = BufferManager::Instance().Get(id);
-                if (b) views_[0].tabs.AddTab(id, b->DisplayName(), b->IsDirty(), false);
-            }
-        }
-        views_[1].activeId = kInvalidBufferID;
-        splitEnabled_ = false;
-        activeView_ = 0;
-    }
-    ::SendMessageW(parent, WM_SIZE, 0, 0);
-}
-
-void Notepad_plus::MoveActiveTabToOtherView()
-{
-    if (!splitEnabled_) return;
-    int from = activeView_;
-    int to   = 1 - from;
-    BufferID id = views_[from].activeId;
-    if (id == kInvalidBufferID) return;
-    if (views_[from].tabs.TabCount() <= 1) return;  // keep at least one
-    Buffer* b = BufferManager::Instance().Get(id);
-    if (!b) return;
-
-    views_[from].tabs.RemoveTab(id);
-    views_[from].activeId = views_[from].tabs.ActiveBuffer();
-    if (views_[from].activeId != kInvalidBufferID) {
-        if (Buffer* nb = BufferManager::Instance().Get(views_[from].activeId)) {
-            views_[from].editor.AttachDocument(nb->DocHandle());
-        }
-    }
-
-    if (views_[to].tabs.IndexOf(id) < 0)
-        views_[to].tabs.AddTab(id, b->DisplayName(), b->IsDirty(), true);
-    else
-        views_[to].tabs.Activate(id);
-
-    activeView_ = to;
-    ActivateBuffer(id);
-}
-
-void Notepad_plus::CloneActiveTabToOtherView()
-{
-    if (!splitEnabled_) return;
-    int from = activeView_;
-    int to   = 1 - from;
-    BufferID id = views_[from].activeId;
-    if (id == kInvalidBufferID) return;
-    Buffer* b = BufferManager::Instance().Get(id);
-    if (!b) return;
-    if (views_[to].tabs.IndexOf(id) < 0) {
-        views_[to].tabs.AddTab(id, b->DisplayName(), b->IsDirty(), true);
-    } else {
-        views_[to].tabs.Activate(id);
-    }
-    activeView_ = to;
-    ActivateBuffer(id);
+    if (v != 0) return;
+    activeView_ = 0;
 }
 
 namespace {
@@ -1312,17 +1065,6 @@ void Notepad_plus::ColumnEdit(const ColumnEditParams& p)
     }
     ed.Call(SCI_ENDUNDOACTION);
     ed.SetFocus();
-}
-
-void Notepad_plus::ToggleCompare()
-{
-    if (compare_.IsActive()) {
-        compare_.Clear(views_[0].editor, views_[1].editor);
-        return;
-    }
-    if (!splitEnabled_) return;
-    if (!views_[1].editor.Hwnd()) return;
-    compare_.Apply(views_[0].editor, views_[1].editor);
 }
 
 bool Notepad_plus::IsInBinaryMode(BufferID id) const

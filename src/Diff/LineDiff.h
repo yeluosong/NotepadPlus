@@ -1,23 +1,36 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <cstdint>
 
 namespace npp {
 
-enum class DiffOp : unsigned char { Equal, Add, Remove, Change };
-
-struct DiffEntry {
-    DiffOp op   = DiffOp::Equal;
-    int    a    = -1;   // 0-based line index in left  (or -1 for pure Add)
-    int    b    = -1;   // 0-based line index in right (or -1 for pure Remove)
+enum class DiffOp : uint8_t {
+    Equal,    // line present on both sides
+    Add,      // present only on right
+    Del,      // present only on left
+    Change    // both sides have a line at this aligned position, but contents differ
 };
 
-// Diff two line vectors into an aligned op list.
-// Pairs adjacent Remove+Add (single-line) into Change for nicer rendering.
-std::vector<DiffEntry> ComputeLineDiff(const std::vector<std::string>& left,
-                                       const std::vector<std::string>& right);
+struct DiffEntry {
+    DiffOp op;
+    int    leftLine;   // index into left lines, -1 if none
+    int    rightLine;  // index into right lines, -1 if none
+};
 
-// Split a UTF-8 buffer into lines (without the line terminators).
-std::vector<std::string> SplitLines(const std::string& body);
+struct LineDiffOptions {
+    bool ignoreWhitespace = false;  // strip all whitespace before comparing
+    bool ignoreCase       = false;
+};
+
+// Split utf-8 text into lines (LF or CRLF or CR terminated). Trailing
+// newline produces a final empty line, matching most diff tools.
+std::vector<std::string> SplitLines(const std::string& utf8);
+
+// Compute aligned diff between two line vectors. Result entries are in
+// display order, suitable for line-by-line rendering on both sides.
+std::vector<DiffEntry> ComputeLineDiff(const std::vector<std::string>& left,
+                                       const std::vector<std::string>& right,
+                                       const LineDiffOptions& opt = {});
 
 } // namespace npp
