@@ -36,6 +36,9 @@ public:
     ThemeId Theme() const { return theme_; }
     void SetTheme(ThemeId t) { theme_ = t; }
 
+    bool WordWrap() const { return wordWrap_; }
+    void SetWordWrap(bool on) { wordWrap_ = on; }
+
     // Convenience: "is this theme dark-family?" — kept for call sites that only
     // need a light/dark split (DWM immersive dark, markdown accent colors).
     bool DarkMode() const { return IsDarkFamily(theme_); }
@@ -59,6 +62,7 @@ private:
     Parameters() = default;
     std::deque<std::wstring> recent_;
     ThemeId theme_ = ThemeId::ModernLight;
+    bool wordWrap_ = false;
     // Cache of the last bytes written to recent.txt; Save() skips the write
     // when the serialized state is unchanged. Matters for bulk operations
     // like multi-file open / save-all which call Save() per item.

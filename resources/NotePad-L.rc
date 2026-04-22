@@ -96,6 +96,8 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Find &Results",                  IDM_VIEW_FIND_RESULTS
         MENUITEM SEPARATOR
+        MENUITEM "&Word Wrap",                     IDM_VIEW_WORD_WRAP
+        MENUITEM SEPARATOR
         POPUP "&Theme"
         BEGIN
             MENUITEM "&Modern Light",               IDM_VIEW_THEME_LIGHT

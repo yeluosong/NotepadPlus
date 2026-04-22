@@ -87,6 +87,8 @@ void Parameters::Load()
             else if (line.rfind(L"cmpHexRight=",   0) == 0) cmpHexRight   = line.substr(12);
             else if (line.rfind(L"cmpFolderLeft=", 0) == 0) cmpFolderLeft = line.substr(14);
             else if (line.rfind(L"cmpFolderRight=",0) == 0) cmpFolderRight= line.substr(15);
+            else if (line == L"wordWrap=1") wordWrap_ = true;
+            else if (line == L"wordWrap=0") wordWrap_ = false;
         }
     }
 }
@@ -106,6 +108,9 @@ void Parameters::Save() const
     std::wstring settings;
     settings += L"theme=";
     settings += std::to_wstring(static_cast<int>(theme_));
+    settings += L"\r\n";
+    settings += L"wordWrap=";
+    settings += (wordWrap_ ? L"1" : L"0");
     settings += L"\r\n";
     auto kv = [&](const wchar_t* key, const std::wstring& v) {
         if (v.empty()) return;

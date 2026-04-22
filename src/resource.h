@@ -97,6 +97,7 @@
 // Search — Find in Files
 #define IDM_SEARCH_FINDFILES        40420
 #define IDM_VIEW_FOLDER_OPEN        40710   // open folder in workspace
+#define IDM_VIEW_WORD_WRAP          40720   // toggle line wrapping
 
 // Internal (not in menu): double-click hits in find-results panel
 #define IDM_INTERNAL_FINDRES_GOTO   41500

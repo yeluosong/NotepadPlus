@@ -11,6 +11,15 @@ namespace npp {
 // Reads Parameters::Theme() to choose the active palette.
 void ApplyLanguage(ScintillaEditView& view, LangType lang);
 
+// For Markdown buffers: scan for ```lang ... ``` fenced code blocks and
+// re-style their bodies as the embedded language. Idempotent — call after
+// the markdown lexer has run, and again on every text change.
+void StyleMarkdownFences(ScintillaEditView& view);
+
+// Post-lex pass for code buffers: any identifier immediately followed by '('
+// is recolored as a function name (VS Code-style yellow). Idempotent.
+void HighlightFunctionNames(ScintillaEditView& view, LangType lang);
+
 // ---- Shared UI palette ----------------------------------------------------
 // Used by dialogs, tab bar, and chrome to keep a consistent look.
 // Chrome layered: chromeBg (menu/toolbar/tabs) > editorBg > statusBg.

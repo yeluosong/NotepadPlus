@@ -614,6 +614,12 @@ void Notepad_plus_Window::OnCreate(HWND h)
     if (!opened) app_.DoNew();
     RebuildRecentMenu();
     BuildLanguageMenu();
+    if (Parameters::Instance().WordWrap()) {
+        for (int v = 0; v < 2; ++v) {
+            if (app_.V(v).editor.Hwnd())
+                app_.V(v).editor.Call(SCI_SETWRAPMODE, SC_WRAP_WORD);
+        }
+    }
     UpdateCheckedMenus();
     OnSize(h);
     app_.UpdateTitle(h);
@@ -787,6 +793,9 @@ void Notepad_plus_Window::UpdateCheckedMenus()
     // Binary (hex) mode toggle.
     ::CheckMenuItem(bar, IDM_EDIT_BINARY_MODE,
         MF_BYCOMMAND | (app_.IsInBinaryMode(b->Id()) ? MF_CHECKED : MF_UNCHECKED));
+    // Word-wrap toggle.
+    ::CheckMenuItem(bar, IDM_VIEW_WORD_WRAP,
+        MF_BYCOMMAND | (Parameters::Instance().WordWrap() ? MF_CHECKED : MF_UNCHECKED));
     // Language radio: clear all, check the active one.
     UINT firstLang = IDM_LANG_BASE;
     UINT lastLang  = IDM_LANG_BASE + static_cast<UINT>(LangType::Count_) - 1;
@@ -1524,6 +1533,24 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
                 RefreshSmartHighlight(app_.V(editorView).editor);
                 break;
             case SCN_MODIFIED:
+                // Re-style only on user-initiated edits / undo / redo. File loads
+                // and other programmatic SCI_SETTEXT carry none of these perf
+                // flags, so the heavy whole-buffer pass is skipped during open
+                // (ApplyLanguage runs it once at end of load).
+                if ((scn->modificationType &
+                        (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) &&
+                    (scn->modificationType &
+                        (SC_PERFORMED_USER | SC_PERFORMED_UNDO | SC_PERFORMED_REDO)))
+                {
+                    if (Buffer* mb = BufferManager::Instance().Get(
+                            app_.V(editorView).activeId)) {
+                        if (mb->GetLang() == LangType::Markdown)
+                            StyleMarkdownFences(app_.V(editorView).editor);
+                        else
+                            HighlightFunctionNames(
+                                app_.V(editorView).editor, mb->GetLang());
+                    }
+                }
                 if ((scn->modificationType &
                         (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) &&
                     app_.IsInBinaryMode(app_.V(editorView).activeId))
@@ -1691,6 +1718,18 @@ LRESULT Notepad_plus_Window::WndProc(HWND h, UINT m, WPARAM w, LPARAM l)
         case IDM_VIEW_FIND_RESULTS:
             app_.ToggleDock(DockSide::Bottom);
             break;
+        case IDM_VIEW_WORD_WRAP: {
+            bool on = !Parameters::Instance().WordWrap();
+            Parameters::Instance().SetWordWrap(on);
+            for (int v = 0; v < 2; ++v) {
+                if (app_.V(v).editor.Hwnd())
+                    app_.V(v).editor.Call(SCI_SETWRAPMODE,
+                        on ? SC_WRAP_WORD : SC_WRAP_NONE);
+            }
+            UpdateCheckedMenus();
+            Parameters::Instance().Save();
+            break;
+        }
         case IDM_VIEW_DARKMODE:
             CycleTheme();
             break;
